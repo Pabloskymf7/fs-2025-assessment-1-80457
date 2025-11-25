@@ -1,23 +1,40 @@
 using fs_2025_assessment_1_80457.Services;
+using Asp.Versioning;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// --- Servicios Esenciales ---
 builder.Services.AddSingleton<IStationRepository, InMemoryStationRepository>();
-
 builder.Services.AddMemoryCache();
 
+// Agrega soporte para Controllers
 builder.Services.AddControllers();
+
+// --- Configuración de Versionamiento ---
+// Esta es la parte clave. Usamos ApiVersion para la versión 1.0.
 builder.Services.AddApiVersioning(options =>
 {
+    // Se establece la versión V1.0 como predeterminada si el cliente no especifica una.
     options.AssumeDefaultVersionWhenUnspecified = true;
-    options.DefaultApiVersion = new Microsoft.AspNetCore.Mvc.ApiVersion(1, 0);
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    // Informa las versiones soportadas en el encabezado de respuesta 'api-supported-versions'.
     options.ReportApiVersions = true;
+})
+// Configura la integración con Swagger/OpenAPI (API Explorer)
+.AddMvc()
+.AddApiExplorer(options =>
+{
+    // Formato para reemplazar el placeholder 'v{version:apiVersion}' en la ruta de Swagger
+    options.GroupNameFormat = "'v'VVV";
+    // Reemplaza la versión en el patrón de ruta del controller (Ej: /api/v1/stations)
+    options.SubstituteApiVersionInUrl = true;
 });
-builder.Services.AddEndpointsApiExplorer();
+
+
+// --- Configuración de Swagger/OpenAPI ---
+builder.Services.AddEndpointsApiExplorer(); // Solo es necesario si usas Minimal APIs o para compatibilidad
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
