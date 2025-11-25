@@ -1,21 +1,39 @@
 ﻿using Asp.Versioning;
+using fs_2025_assessment_1_80457.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace fs_2025_assessment_1_80457.Controllers
 {
-    // 1. Define la ruta base con el placeholder de la versión
     [Route("api/v{version:apiVersion}/stations")]
     [ApiController]
-    // 2. Asigna el controller a la versión 1.0
     [ApiVersion(1.0)]
     public class StationsV1Controller : ControllerBase
     {
-        // ... Constructor y Lógica de V1 (usa IStationRepository in-memory/JSON)
-        [HttpGet]
-        public IActionResult GetStations()
+        // El Controller debe depender de la interfaz del repositorio o servicio
+        private readonly IStationRepository _repository;
+
+        // 1. CONSTRUCTOR: Inyección de Dependencia (DI)
+        public StationsV1Controller(IStationRepository repository)
         {
-            // Lógica de V1 (JSON File based)
-            return Ok(new { Version = "V1", Source = "JSON File" });
+            _repository = repository;
         }
+
+        // GET /api/v1/stations
+        [HttpGet]
+        public IActionResult GetStations(
+            // Aquí irán todos los Query Parameters: q, status, minBikes, sort, page, pageSize
+            [FromQuery] string? q = null,
+            [FromQuery] string? status = null)
+        {
+            // 2. LÓGICA: Llama al repositorio para obtener los datos.
+            // NOTA: Idealmente, llamarías a un IStationService, no directamente al IStationRepository.
+            var stations = _repository.GetAll();
+
+            // 3. RESPUESTA: Devuelve 200 OK con los datos.
+            // El framework automáticamente serializa 'stations' a JSON.
+            return Ok(stations);
+        }
+
+        // --- También faltaría el GET por número, POST, PUT, y SUMMARY ---
     }
 }
