@@ -1,7 +1,13 @@
-using fs_2025_assessment_1_80457.Services;
 using Asp.Versioning;
+using Asp.Versioning.ApiExplorer;
+using fs_2025_assessment_1_80457.Services;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ===================================
+// 1. CONFIGURACIÓN DE SERVICIOS
+// ===================================
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -9,8 +15,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<IStationRepository, InMemoryStationRepository>();
 builder.Services.AddMemoryCache();
 
-// Agrega soporte para Controllers
-builder.Services.AddControllers();
+// ===================================
+// 2. CONFIGURACIÓN DE VERSIONAMIENTO (V1 & V2)
+// ===================================
 
 // --- Configuración de Versionamiento ---
 // Esta es la parte clave. Usamos ApiVersion para la versión 1.0.
@@ -21,6 +28,13 @@ builder.Services.AddApiVersioning(options =>
     options.DefaultApiVersion = new ApiVersion(1, 0);
     // Informa las versiones soportadas en el encabezado de respuesta 'api-supported-versions'.
     options.ReportApiVersions = true;
+
+    options.ApiVersionReader = ApiVersionReader.Combine(
+        // Lee la versión desde el encabezado 'x-api-version'
+        new QueryStringApiVersionReader("x-api-version"),
+        // Lee la versión desde la cadena de consulta '?api-version='
+        new HeaderApiVersionReader("api-version")
+    );
 })
 // Configura la integración con Swagger/OpenAPI (API Explorer)
 .AddMvc()
@@ -32,45 +46,50 @@ builder.Services.AddApiVersioning(options =>
     options.SubstituteApiVersionInUrl = true;
 });
 
+// ===================================
+// 3. CONFIGURACIÓN DE SWAGGER PARA MULTIPLES VERSIONES
+// ===================================
+builder.Services.AddSwaggerGen(options =>
+{
+    // Obtiene el proveedor que describe las versiones disponibles
+    var apiVersionDescriptionProvider = builder.Services.BuildServiceProvider()
+        .GetRequiredService<IApiVersionDescriptionProvider>();
 
-// --- Configuración de Swagger/OpenAPI ---
-builder.Services.AddEndpointsApiExplorer(); // Solo es necesario si usas Minimal APIs o para compatibilidad
-builder.Services.AddSwaggerGen();
+    // Crea un documento de Swagger separado para cada versión (V1 y V2)
+    foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
+    {
+        options.SwaggerDoc(description.GroupName, new OpenApiInfo
+        {
+            Title = $"Dublin Bikes API {description.ApiVersion}",
+            Version = description.ApiVersion.ToString(),
+            Description = description.IsDeprecated ? "Esta versión está obsoleta." : null
+        });
+    }
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// ===================================
+// 4. CONFIGURACIÓN DEL PIPELINE HTTP
+// ===================================
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    // Muestra las versiones V1 y V2 en el menú desplegable de la UI de Swagger
+    app.UseSwaggerUI(options =>
+    {
+        var apiVersionDescriptionProvider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+        foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
+        {
+            options.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json",
+                description.GroupName.ToUpperInvariant());
+        }
+    });
 }
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
-
+app.MapControllers();
 app.Run();
 
-internal record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
