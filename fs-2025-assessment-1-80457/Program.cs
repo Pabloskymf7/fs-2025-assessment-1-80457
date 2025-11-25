@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
+using fs_2025_assessment_1_80457.Background;
 using fs_2025_assessment_1_80457.Services;
 using Microsoft.OpenApi.Models;
 
@@ -9,11 +10,15 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. CONFIGURACIÓN DE SERVICIOS
 // ===================================
 
+builder.Services.AddControllers();
+
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 // --- Servicios Esenciales ---
 builder.Services.AddSingleton<IStationRepository, InMemoryStationRepository>();
 builder.Services.AddMemoryCache();
+
+builder.Services.AddHostedService<BikeUpdateService>();
 
 // ===================================
 // 2. CONFIGURACIÓN DE VERSIONAMIENTO (V1 & V2)

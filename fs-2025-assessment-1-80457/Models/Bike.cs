@@ -1,4 +1,6 @@
-﻿namespace fs_2025_assessment_1_80457.Models
+﻿using System.Text.Json.Serialization;
+
+namespace fs_2025_assessment_1_80457.Models
 {
     public class Bike
     {
@@ -13,7 +15,34 @@
         public int available_bike_stands { get; set; }
         public int available_bikes { get; set; }
         public string status { get; set; }
-        public object last_update { get; set; }
-    }
 
+        [JsonPropertyName("last_update")] // Asegura el mapeo correcto desde el JSON
+        public long last_update_epoch { get; set; } // Usar 'long' para epoch ms
+
+        // Propiedad calculada: Convierte epoch ms a DateTimeOffset (UTC)
+        [JsonIgnore] // Opcional: Para evitar que aparezca en el JSON de respuesta si no quieres el epoch
+        public DateTimeOffset LastUpdateUtc => DateTimeOffset.FromUnixTimeMilliseconds(last_update_epoch);
+
+        // Propiedad calculada: Hora Local de Dublín
+        public DateTimeOffset LastUpdateLocal
+        {
+            get
+            {
+                // Zona horaria de Dublin (o la que corresponda al sistema operativo)
+                var dublinTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Dublin");
+                return TimeZoneInfo.ConvertTime(LastUpdateUtc, dublinTimeZone);
+            }
+        }
+
+        // Propiedad calculada: Ocupación (Occupancy)
+        public float Occupancy
+        {
+            get
+            {
+                // Manejar la división por cero
+                if (bike_stands == 0) return 0.0f;
+                return (float)available_bikes / bike_stands;
+            }
+        }
+    }
 }
