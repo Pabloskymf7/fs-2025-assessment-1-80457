@@ -18,7 +18,9 @@ builder.Services.AddControllers();
 builder.Services.AddSingleton<IStationRepository, InMemoryStationRepository>();
 builder.Services.AddMemoryCache();
 
-builder.Services.AddHostedService<BikeUpdateService>();
+builder.Services.AddSingleton<IStationService, StationService>();
+
+builder.Services.AddHostedService<fs_2025_assessment_1_80457.Background.BikeUpdateService>();
 
 // ===================================
 // 2. CONFIGURACIÓN DE VERSIONAMIENTO (V1 & V2)
