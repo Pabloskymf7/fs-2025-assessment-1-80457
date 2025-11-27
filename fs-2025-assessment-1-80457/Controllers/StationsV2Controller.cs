@@ -138,27 +138,28 @@ namespace fs_2025_assessment_1_80457.Controllers
             [FromQuery] int pageSize = 10)
         {
             // Obtiene todos los datos de Cosmos DB y los convierte a IQueryable para filtrar en memoria (más simple).
-            var stations = (await _cosmosRepo.GetAllAsync()).AsQueryable();
+            var stations = (await _cosmosRepo.GetAllAsync() ?? Enumerable.Empty<Bike>()).AsQueryable();
 
-            // 1. Filtrado y Búsqueda
+            // 1. Filtrado y Búsqueda (con comprobaciones nulas para evitar NRE)
             if (!string.IsNullOrWhiteSpace(query))
             {
                 string lowerQuery = query.ToLowerInvariant();
                 stations = stations.Where(s =>
-                    s.name.ToLowerInvariant().Contains(lowerQuery) ||
-                    s.address.ToLowerInvariant().Contains(lowerQuery));
+                    (!string.IsNullOrEmpty(s.name) && s.name.ToLowerInvariant().Contains(lowerQuery)) ||
+                    (!string.IsNullOrEmpty(s.address) && s.address.ToLowerInvariant().Contains(lowerQuery)));
             }
 
             if (!string.IsNullOrWhiteSpace(status))
             {
+                // Comparación segura y sin sensibilidad a mayúsculas
                 string upperStatus = status.ToUpperInvariant();
-                stations = stations.Where(s => s.status.Equals(upperStatus));
+                stations = stations.Where(s => !string.IsNullOrEmpty(s.status) && string.Equals(s.status, upperStatus, StringComparison.OrdinalIgnoreCase));
             }
 
-            // 2. Ordenamiento
+            // 2. Ordenamiento (manejar posibles nulos con coalescing)
             stations = sortBy?.ToLowerInvariant() switch
             {
-                "name" => stations.OrderBy(s => s.name),
+                "name" => stations.OrderBy(s => s.name ?? string.Empty),
                 "bikes" => stations.OrderByDescending(s => s.available_bikes),
                 "docks" => stations.OrderByDescending(s => s.available_bike_stands),
                 _ => stations.OrderBy(s => s.number), // Orden por defecto

@@ -18,8 +18,23 @@ namespace fs_2025_assessment_1_80457.Services
         // ===========================================
         // MÉTODOS DE MUTACIÓN (Pasa directamente al Repositorio)
         // ===========================================
-        public void AddStation(Bike station) => _repository.Add(station);
-        public bool UpdateStation(int number, Bike station) => _repository.Update(number, station);
+        public void AddStation(Bike station)
+        {
+            _repository.Add(station);
+            _cache.Remove(CacheKey);
+        }
+        public bool UpdateStation(int number, Bike station)
+        {
+            var result = _repository.Update(number, station);
+            if (result) _cache.Remove(CacheKey);
+            return result;
+        }
+        public bool DeleteStation(int number)
+        {
+            var result = _repository.Delete(number);
+            if (result) _cache.Remove(CacheKey);
+            return result;
+        }
 
         // ===========================================
         // MÉTODOS DE CONSULTA
@@ -43,8 +58,8 @@ namespace fs_2025_assessment_1_80457.Services
                 TotalBikeStands = stations.Sum(s => s.bike_stands), // stands ocupados
                                                                     // Total Docks (TotalCapacity)
                 TotalDocks = stations.Sum(s => s.available_bike_stands) + stations.Sum(s => s.available_bikes),
-                // Cuentas por estado (OPEN/CLOSED)
-                StatusCounts = stations.GroupBy(s => s.status.ToUpperInvariant())
+                // Cuentas por estado (OPEN/CLOSED). Usar valor por defecto si status es nulo
+                StatusCounts = stations.GroupBy(s => (s.status ?? "UNKNOWN").ToUpperInvariant())
                     .Select(g => new { Status = g.Key, Count = g.Count() })
             };
         }
@@ -76,14 +91,15 @@ namespace fs_2025_assessment_1_80457.Services
             {
                 string lowerQ = q.ToLowerInvariant();
                 query = query.Where(s =>
-                    s.name.ToLowerInvariant().Contains(lowerQ) ||
-                    s.address.ToLowerInvariant().Contains(lowerQ));
+                    (!string.IsNullOrEmpty(s.name) && s.name.ToLowerInvariant().Contains(lowerQ)) ||
+                    (!string.IsNullOrEmpty(s.address) && s.address.ToLowerInvariant().Contains(lowerQ)));
             }
 
             if (!string.IsNullOrEmpty(status))
             {
-                string upperStatus = status.ToUpperInvariant();
-                query = query.Where(s => s.status.ToUpperInvariant() == upperStatus);
+                // Usar comparación segura y sin distinguir mayúsculas/minúsculas para evitar NRE
+                query = query.Where(s => !string.IsNullOrEmpty(s.status) &&
+                                          string.Equals(s.status, status, StringComparison.OrdinalIgnoreCase));
             }
 
             if (minBikes.HasValue && minBikes.Value > 0)

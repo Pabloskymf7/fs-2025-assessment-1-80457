@@ -26,12 +26,28 @@ namespace fs_2025_assessment_1_80457.Controllers
             [FromQuery] string? sort = null,
             [FromQuery] string? dir = "asc",
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 10)
+            [FromQuery] int pageSize = int.MaxValue)
         {
             var stations = _service.GetStationsAdvanced(q, status, minBikes, sort, dir, page, pageSize);
 
             // Nota: En una API de producción, devolverías aquí un DTO de paginación
             return Ok(stations);
+        }
+
+        // Add compatibility route so tests that call /search still work
+        [HttpGet("search")]
+        public IActionResult SearchStations(
+            [FromQuery] string? q = null,
+            [FromQuery] string? status = null,
+            [FromQuery] int? minBikes = null,
+            [FromQuery(Name = "sortBy")] string? sortBy = null,
+            [FromQuery] string? dir = "asc",
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = int.MaxValue)
+        {
+            // Map incoming "sortBy" query parameter to the internal "sort" parameter
+            var sort = string.IsNullOrEmpty(sortBy) ? null : sortBy;
+            return GetStations(q, status, minBikes, sort, dir, page, pageSize);
         }
 
         // 2. GET /api/v1/stations/{number} (Detalle)
@@ -78,6 +94,18 @@ namespace fs_2025_assessment_1_80457.Controllers
             }
 
             return NoContent(); // Retorna 204 No Content para una actualización exitosa
+        }
+
+        // 6. DELETE /api/v1/stations/{number} (Eliminación)
+        [HttpDelete("{number:int}")]
+        public IActionResult DeleteStation(int number)
+        {
+            if (!_service.DeleteStation(number))
+            {
+                return NotFound();
+            }
+
+            return NoContent();
         }
     }
 }

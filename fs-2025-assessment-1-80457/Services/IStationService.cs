@@ -20,5 +20,6 @@ namespace fs_2025_assessment_1_80457.Services
 
         void AddStation(Bike station);
         bool UpdateStation(int number, Bike station);
+        bool DeleteStation(int number);
     }
 }
