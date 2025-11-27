@@ -1,26 +1,32 @@
-﻿using System.Collections.Concurrent;
+﻿using fs_2025_assessment_1_80457.Models;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using static System.Collections.Specialized.BitVector32;
 
 namespace fs_2025_assessment_1_80457.Services
 {
-    public class InMemoryStationRepository : IStationRepository
+    // Implementation of the in-memory repository.
+    // It implements both synchronous (V1) and asynchronous (V2 Mock) interfaces.
+    public class InMemoryStationRepository : IStationRepository, ICosmosDbRepository
     {
-        private readonly ConcurrentDictionary<int, Models.Bike> _store = new();
+        private readonly ConcurrentDictionary<int, Bike> _store = new();
         private readonly ILogger<InMemoryStationRepository> _logger;
         private readonly object _replaceLock = new();
 
-        public InMemoryStationRepository(ILogger<InMemoryStationRepository> logger)
+        // Constructor requires IConfiguration for data loading setup.
+        public InMemoryStationRepository(IConfiguration configuration, ILogger<InMemoryStationRepository> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            LoadFromJsonOnStartup();
+            LoadFromJsonOnStartup(configuration);
         }
 
-        private void LoadFromJsonOnStartup()
+        private void LoadFromJsonOnStartup(IConfiguration configuration)
         {
             try
             {
+                // Assumes 'dublinbike.json' is available under a 'Data' folder relative to the execution path.
                 var dataPath = Path.Combine(AppContext.BaseDirectory, "Data", "dublinbike.json");
+
                 if (!File.Exists(dataPath))
                 {
                     _logger.LogError("dublinbike.json not found at {path}", dataPath);
@@ -30,24 +36,45 @@ namespace fs_2025_assessment_1_80457.Services
                 var json = File.ReadAllText(dataPath);
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 var bike = JsonSerializer.Deserialize<List<Models.Bike>>(json, options);
-                if (bike == null)
-                {
-                    _logger.LogError("Could not deserialize station list from JSON.");
-                    return;
-                }
 
-                foreach (var b in bike)
+                if (bike != null)
                 {
-                    _store[b.number] = b;
+                    foreach (var b in bike)
+                    {
+                        _store[b.number] = b;
+                    }
+                    _logger.LogInformation("Loaded {count} stations from JSON.", _store.Count);
                 }
-                _logger.LogInformation("Loaded {count} stations from JSON.", _store.Count);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading dublinbike.json");
-                throw;
             }
         }
+
+        // =============================================================
+        // ASYNCHRONOUS IMPLEMENTATIONS (ICosmosDbRepository)
+        // These methods use Task.FromResult to wrap the synchronous logic for the V2 Mock.
+        // =============================================================
+
+        public Task<IEnumerable<Bike>> GetAllAsync() => Task.FromResult(GetAll());
+
+        public Task<Bike?> GetByNumberAsync(int number) => Task.FromResult(GetByNumber(number));
+
+        public Task AddAsync(Bike bike)
+        {
+            Add(bike);
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> UpdateAsync(int number, Bike bike) => Task.FromResult(Update(number, bike));
+
+        public Task<bool> DeleteAsync(int number) => Task.FromResult(Delete(number));
+
+        // =============================================================
+        // SYNCHRONOUS IMPLEMENTATIONS (IStationRepository)
+        // These methods support the V1 controller and are used by the async wrappers.
+        // =============================================================
 
         public IEnumerable<Models.Bike> GetAll() => _store.Values.OrderBy(b => b.number);
 
@@ -63,6 +90,7 @@ namespace fs_2025_assessment_1_80457.Services
         public bool Update(int number, Models.Bike bike)
         {
             if (bike == null) throw new ArgumentNullException(nameof(bike));
+            // Uses AddOrUpdate for concurrent update logic
             return _store.AddOrUpdate(number, bike, (_, __) => bike) != null;
         }
 
@@ -74,7 +102,6 @@ namespace fs_2025_assessment_1_80457.Services
         public void ReplaceAll(IEnumerable<Models.Bike> bike)
         {
             if (bike == null) throw new ArgumentNullException(nameof(bike));
-            // lock to ensure atomic-ish replacement while keeping _store ConcurrentDictionary
             lock (_replaceLock)
             {
                 _store.Clear();
