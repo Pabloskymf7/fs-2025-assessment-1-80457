@@ -1,8 +1,10 @@
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using fs_2025_assessment_1_80457.Background;
+using fs_2025_assessment_1_80457.Models;
 using fs_2025_assessment_1_80457.Services;
 using Microsoft.OpenApi.Models;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 // ===================================
 
 builder.Services.AddControllers();
+builder.Services.Configure<CosmosDbSettings>(builder.Configuration.GetSection("CosmosDb"));
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -22,6 +25,7 @@ builder.Services.AddSingleton<IStationService, StationService>();
 
 builder.Services.AddHostedService<fs_2025_assessment_1_80457.Background.BikeUpdateService>();
 
+builder.Services.AddSingleton<ICosmosDbRepository, CosmosDbStationRepository>();
 // ===================================
 // 2. CONFIGURACIÓN DE VERSIONAMIENTO (V1 & V2)
 // ===================================
@@ -76,6 +80,44 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var cosmosRepo = scope.ServiceProvider.GetRequiredService<ICosmosDbRepository>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        // 1. LECTURA DEL JSON (Misma lógica de la V1)
+        var dataPath = Path.Combine(AppContext.BaseDirectory, "Data", "dublinbike.json");
+        var json = File.ReadAllText(dataPath);
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var bikes = JsonSerializer.Deserialize<List<Bike>>(json, options);
+
+        if (bikes != null && bikes.Any())
+        {
+            // Comprobación MÍNIMA para evitar seeding si ya hay datos
+            // (En un sistema real, harías un query COUNT)
+            if (bikes.Count > 1)
+            {
+                logger.LogInformation("Attempting to seed {count} documents into Cosmos DB Emulator...", bikes.Count);
+
+                // 2. INSERTAR CADA DOCUMENTO DE FORMA ASÍNCRONA
+                foreach (var bike in bikes)
+                {
+                    // Asigna un ID único si es necesario, aunque Cosmos generará uno
+                    bike.id = bike.number.ToString();
+                    await cosmosRepo.AddAsync(bike);
+                }
+                logger.LogInformation("Successfully seeded data into Cosmos DB Emulator.");
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        // Aquí capturamos errores de conexión al Emulador o al JSON
+        logger.LogError(ex, "ERROR during Cosmos DB Seeding. Check Emulador status and appsettings.");
+    }
+}
 // ===================================
 // 4. CONFIGURACIÓN DEL PIPELINE HTTP
 // ===================================

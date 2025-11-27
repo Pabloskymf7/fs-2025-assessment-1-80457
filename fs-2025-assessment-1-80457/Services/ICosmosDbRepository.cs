@@ -2,7 +2,7 @@
 
 namespace fs_2025_assessment_1_80457.Services
 {
-    public interface IComosDbRepository
+    public interface ICosmosDbRepository
     {
         Task<IEnumerable<Bike>> GetAllAsync();
         Task<Bike?> GetByNumberAsync(int number);

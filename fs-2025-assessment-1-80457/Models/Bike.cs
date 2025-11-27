@@ -4,6 +4,8 @@ namespace fs_2025_assessment_1_80457.Models
 {
     public class Bike
     {
+        [JsonPropertyName("id")]
+        public string? id { get; set; }
         public int number { get; set; }
         public string contract_name { get; set; }
         public string name { get; set; }
