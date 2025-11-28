@@ -136,5 +136,58 @@ namespace fs_2025_assessment_1_80457_Test
             var sortedNumbers = numbers.OrderBy(n => n).ToList();
             Assert.Equal(sortedNumbers, numbers);
         }
+
+
+        // ✅ NUEVO: Prueba de búsqueda avanzada con filtrado por bicicletas y orden descendente.
+        [Fact]
+        public async Task SearchAdvanced_FiltersByMinBikesAndSortsByBikesDesc()
+        {
+            // Arrange: Buscamos estaciones ABIERTAS con al menos 1 bicicleta, ordenadas por disponibilidad (descendente)
+            var url = $"{V2_BASE_URL}/search?status=OPEN&minBikes=1&sortBy=bikes&dir=desc&pageSize=5";
+
+            // Act
+            var response = await _client.GetAsync(url);
+
+            // Assert
+            response.EnsureSuccessStatusCode();
+            var stations = await response.Content.ReadFromJsonAsync<List<Bike>>();
+
+            Assert.NotNull(stations);
+            Assert.True(stations.Count <= 5); // Verifica paginación
+
+            // Verifica filtrado avanzado
+            Assert.True(stations.All(s => s.status == "OPEN"));
+            Assert.True(stations.All(s => s.available_bikes >= 1)); // Filtro minBikes
+
+            // Verifica ordenamiento (descendente por available_bikes)
+            var availableBikes = stations.Select(s => s.available_bikes).ToList();
+            var sortedBikesDesc = availableBikes.OrderByDescending(b => b).ToList();
+            Assert.Equal(sortedBikesDesc, availableBikes);
+        }
+
+        // ✅ NUEVO: Prueba del endpoint de Resumen/Agregación.
+        [Fact]
+        public async Task GetSummary_ReturnsCorrectAggregateData()
+        {
+            // Act: Llamar al endpoint /summary
+            var response = await _client.GetAsync($"{V2_BASE_URL}/summary");
+
+            // Assert
+            response.EnsureSuccessStatusCode();
+            // Leemos la respuesta como un diccionario para acceder a las propiedades agregadas
+            var summaryDict = await response.Content.ReadFromJsonAsync<Dictionary<string, int>>();
+
+            Assert.NotNull(summaryDict);
+
+            // Verificamos que las propiedades de agregación existen
+            Assert.True(summaryDict.ContainsKey("totalStations"));
+            Assert.True(summaryDict.ContainsKey("totalBikeStands"));
+            Assert.True(summaryDict.ContainsKey("totalAvailableBikes"));
+
+            // Verificamos que las cuentas agregadas son mayores a un umbral razonable
+            Assert.True(summaryDict["totalStations"] > 50);
+            Assert.True(summaryDict["totalBikeStands"] > 0);
+            Assert.True(summaryDict["totalAvailableBikes"] > 0);
+        }
     }
 }

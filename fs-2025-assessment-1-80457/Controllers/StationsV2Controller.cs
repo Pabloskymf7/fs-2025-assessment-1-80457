@@ -2,6 +2,7 @@
 using fs_2025_assessment_1_80457.Models;
 using fs_2025_assessment_1_80457.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 
 namespace fs_2025_assessment_1_80457.Controllers
 {
@@ -123,58 +124,45 @@ namespace fs_2025_assessment_1_80457.Controllers
         }
 
         // ====================================================================
-        // 7. ENDPOINT SEARCH (Filtrado, Paginación, Ordenamiento)
+        // ✅ 7. ENDPOINT SEARCH (CORREGIDO: Delega la lógica a Cosmos DB)
         // ====================================================================
         /// <summary>
-        /// V2: Permite buscar, filtrar y ordenar estaciones. (GET /api/v2/stations/search)
+        /// V2: Permite buscar, filtrar y ordenar estaciones eficientemente usando Cosmos DB. (GET /api/v2/stations/search)
         /// </summary>
         [HttpGet("search")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IEnumerable<Bike>))]
         public async Task<IActionResult> SearchStations(
-            [FromQuery] string? query,
+            [FromQuery] string? q, // Usado 'q' para ser consistente con la búsqueda
             [FromQuery] string? status,
+            [FromQuery] int? minBikes, // ✅ Añadido: Parámetro para filtrar por disponibilidad
             [FromQuery] string sortBy = "number",
+            [FromQuery] string dir = "asc", // ✅ Añadido: Dirección de ordenación
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 10)
         {
-            // Obtiene todos los datos de Cosmos DB y los convierte a IQueryable para filtrar en memoria (más simple).
-            var stations = (await _cosmosRepo.GetAllAsync() ?? Enumerable.Empty<Bike>()).AsQueryable();
+            // CRÍTICO: Se elimina la carga de todos los datos en memoria.
+            // Toda la lógica de filtrado, ordenación y paginación se delega al repositorio.
+            var pagedStations = await _cosmosRepo.SearchStationsAdvancedAsync(
+                q, status, minBikes, sortBy, dir, page, pageSize);
 
-            // 1. Filtrado y Búsqueda (con comprobaciones nulas para evitar NRE)
-            if (!string.IsNullOrWhiteSpace(query))
-            {
-                string lowerQuery = query.ToLowerInvariant();
-                stations = stations.Where(s =>
-                    (!string.IsNullOrEmpty(s.name) && s.name.ToLowerInvariant().Contains(lowerQuery)) ||
-                    (!string.IsNullOrEmpty(s.address) && s.address.ToLowerInvariant().Contains(lowerQuery)));
-            }
-
-            if (!string.IsNullOrWhiteSpace(status))
-            {
-                // Comparación segura y sin sensibilidad a mayúsculas
-                string upperStatus = status.ToUpperInvariant();
-                stations = stations.Where(s => !string.IsNullOrEmpty(s.status) && string.Equals(s.status, upperStatus, StringComparison.OrdinalIgnoreCase));
-            }
-
-            // 2. Ordenamiento (manejar posibles nulos con coalescing)
-            stations = sortBy?.ToLowerInvariant() switch
-            {
-                "name" => stations.OrderBy(s => s.name ?? string.Empty),
-                "bikes" => stations.OrderByDescending(s => s.available_bikes),
-                "docks" => stations.OrderByDescending(s => s.available_bike_stands),
-                _ => stations.OrderBy(s => s.number), // Orden por defecto
-            };
-
-            // 3. Paginación
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 10;
-
-            var pagedStations = stations
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
+            // Cambiado: siempre devolvemos 200 OK con una lista (vacía si no hay resultados)
+            if (pagedStations == null) pagedStations = Enumerable.Empty<Bike>();
 
             return Ok(pagedStations);
+        }
+
+        // ====================================================================
+        // ✅ 8. ENDPOINT GET (Resumen/Agregado)
+        // ====================================================================
+        /// <summary>
+        /// V2: Retorna información agregada de todas las estaciones. (GET /api/v2/stations/summary)
+        /// </summary>
+        [HttpGet("summary")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetSummary()
+        {
+            var summary = await _cosmosRepo.GetSummaryAsync();
+            return Ok(summary);
         }
     }
 }
