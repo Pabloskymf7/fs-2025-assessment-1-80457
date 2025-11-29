@@ -148,22 +148,18 @@ namespace fs_2025_assessment_1_80457.Services
 
         public async Task<SummaryResponse> GetSummaryAsync()
         {
-            // SQL query for efficient server-side aggregation.
             var sqlQuery = new QueryDefinition(
-                "SELECT VALUE { " +
-                "totalStations: COUNT(1), " +
-                "totalBikeStands: SUM(c.bike_stands), " +
-                "totalAvailableBikes: SUM(c.available_bikes) " +
-                "} FROM c"
+                "SELECT " +
+                "COUNT(1) AS totalStations, " +
+                "SUM(c.bike_stands) AS totalBikeStands, " +
+                "SUM(c.available_bikes) AS totalAvailableBikes " +
+                "FROM c"
             );
 
-            // Use SummaryResponse to let Cosmos deserialize the single aggregated result.
             using var query = _container.GetItemQueryIterator<SummaryResponse>(sqlQuery);
             if (query.HasMoreResults)
             {
                 var response = await query.ReadNextAsync();
-
-                // Return the DTO or a new empty DTO if the response is empty.
                 return response.FirstOrDefault() ?? new SummaryResponse();
             }
 
