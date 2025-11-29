@@ -1,5 +1,6 @@
 ﻿namespace fs_2025_assessment_1_80457.Services
 {
+    // Background service for periodically updating bike station data with random changes.
     public class BikeUpdateService : BackgroundService
     {
         private readonly IStationRepository _repository;
@@ -12,7 +13,6 @@
             _logger = logger;
         }
 
-        // Método principal que se ejecuta al iniciar la aplicación
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation("Bike Update Service is starting. Data will refresh every 15s.");
@@ -21,7 +21,7 @@
             {
                 UpdateStations();
 
-                // Pausa de 15 segundos (intervalo 10-20 segundos requerido)
+                // Pause for 15 seconds (required interval 10-20 seconds).
                 await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken);
             }
         }
@@ -33,20 +33,20 @@
 
             foreach (var station in currentStations)
             {
-                // El número total de docks (capacidad total)
+                // Total capacity (docks + bikes).
                 var totalCapacity = station.bike_stands + station.available_bikes;
 
-                // 1. Nueva disponibilidad: +/- 10% de la capacidad total
+                // Calculate random change: +/- 10% of total capacity.
                 var changeRange = (int)Math.Round(totalCapacity * 0.1);
                 var randomChange = _random.Next(-changeRange, changeRange + 1);
 
                 var newAvailableBikes = station.available_bikes + randomChange;
 
-                // 2. Asegurar que la disponibilidad esté en el rango [0, TotalCapacity]
+                // Ensure available bikes is within the range [0, TotalCapacity].
                 if (newAvailableBikes < 0) newAvailableBikes = 0;
                 if (newAvailableBikes > totalCapacity) newAvailableBikes = totalCapacity;
 
-                // 3. Aplicar las actualizaciones
+                // Apply updates.
                 station.available_bikes = newAvailableBikes;
                 station.available_bike_stands = totalCapacity - newAvailableBikes;
                 station.last_update_epoch = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -54,7 +54,7 @@
                 updatedStations.Add(station);
             }
 
-            // Usar el método atómico del repositorio
+            // Atomically replace all data in the repository.
             _repository.ReplaceAll(updatedStations);
             _logger.LogInformation("Refreshed {count} stations.", updatedStations.Count);
         }

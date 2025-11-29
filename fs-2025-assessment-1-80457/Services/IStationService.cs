@@ -14,9 +14,8 @@ namespace fs_2025_assessment_1_80457.Services
             int pageSize
         );
 
-        // Métodos para detalle, resumen y mutación
         Bike? GetStationByNumber(int number);
-        object GetSummary(); // Devuelve un objeto anónimo o un DTO de resumen
+        object GetSummary();
 
         void AddStation(Bike station);
         bool UpdateStation(int number, Bike station);

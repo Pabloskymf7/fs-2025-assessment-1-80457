@@ -1,5 +1,6 @@
 ﻿namespace fs_2025_assessment_1_80457.Models
 {
+    // Model to hold Cosmos DB connection and resource configuration settings.
     public class CosmosDbSettings
     {
         public string EndpointUri { get; set; } = string.Empty;

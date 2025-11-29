@@ -1,7 +1,7 @@
 ﻿using fs_2025_assessment_1_80457.Models;
 using System.Collections.Concurrent;
 using System.Text.Json;
-using System.Linq; // Añadido para asegurar que se reconoce el método .Sum()
+using System.Linq;
 
 namespace fs_2025_assessment_1_80457.Services
 {
@@ -13,7 +13,6 @@ namespace fs_2025_assessment_1_80457.Services
         private readonly ILogger<InMemoryStationRepository> _logger;
         private readonly object _replaceLock = new();
 
-        // Constructor requires IConfiguration for data loading setup.
         public InMemoryStationRepository(IConfiguration configuration, ILogger<InMemoryStationRepository> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -53,7 +52,7 @@ namespace fs_2025_assessment_1_80457.Services
 
         // =============================================================
         // ASYNCHRONOUS IMPLEMENTATIONS (ICosmosDbRepository - MOCK V2)
-        // Estos métodos envuelven la lógica síncrona en un Task.
+        // These methods wrap the synchronous logic in a Task.
         // =============================================================
 
         public Task<IEnumerable<Bike>> GetAllAsync() => Task.FromResult(GetAll());
@@ -71,17 +70,17 @@ namespace fs_2025_assessment_1_80457.Services
         public Task<bool> DeleteAsync(int number) => Task.FromResult(Delete(number));
 
         // -----------------------------------------------------------------
-        // ✅ MÉTODOS AÑADIDOS PARA EL CONTRATO ICosmosDbRepository (V2)
+        // ICosmosDbRepository V2 Mock Methods (Search and Summary)
         // -----------------------------------------------------------------
 
         public Task<IEnumerable<Bike>> SearchStationsAdvancedAsync(
             string? q, string? status, int? minBikes,
             string? sortBy, string? dir, int page, int pageSize)
         {
-            // Usamos LINQ para simular la búsqueda, filtrado, ordenación y paginación en memoria.
+            // Use LINQ to simulate searching, filtering, sorting, and pagination in memory.
             var stations = _store.Values.AsQueryable();
 
-            // 1. Filtrado y Búsqueda
+            // 1. Filtering and Search
             if (!string.IsNullOrWhiteSpace(q))
             {
                 string lowerQuery = q.ToLowerInvariant();
@@ -101,7 +100,7 @@ namespace fs_2025_assessment_1_80457.Services
                 stations = stations.Where(s => s.available_bikes >= minBikes.Value);
             }
 
-            // 2. Ordenamiento
+            // 2. Sorting
             var sortedStations = sortBy?.ToLowerInvariant() switch
             {
                 "name" => (dir?.ToLowerInvariant() == "desc" ? stations.OrderByDescending(s => s.name ?? string.Empty) : stations.OrderBy(s => s.name ?? string.Empty)),
@@ -110,7 +109,7 @@ namespace fs_2025_assessment_1_80457.Services
                 _ => (dir?.ToLowerInvariant() == "desc" ? stations.OrderByDescending(s => s.number) : stations.OrderBy(s => s.number)),
             };
 
-            // 3. Paginación
+            // 3. Pagination
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
 
@@ -122,26 +121,24 @@ namespace fs_2025_assessment_1_80457.Services
             return Task.FromResult((IEnumerable<Bike>)pagedStations);
         }
 
-
-        // 🐛 CORRECCIÓN: Se actualiza el tipo de retorno para que coincida con ICosmosDbRepository
         public Task<SummaryResponse> GetSummaryAsync()
         {
-            // Usamos LINQ para simular la agregación de Cosmos DB
+            // Use LINQ to simulate Cosmos DB aggregation.
             var allStations = _store.Values;
 
-            // Usamos el DTO SummaryResponse para que coincida con el tipo de retorno
             var summary = new SummaryResponse
             {
                 totalStations = allStations.Count,
-                totalBikeStands = allStations.Sum(s => (long)s.bike_stands), // Se realiza un cast a long si 'bike_stands' es int
-                totalAvailableBikes = allStations.Sum(s => (long)s.available_bikes) // Se realiza un cast a long si 'available_bikes' es int
+                // Cast to long to match the SummaryResponse DTO.
+                totalBikeStands = allStations.Sum(s => (long)s.bike_stands),
+                totalAvailableBikes = allStations.Sum(s => (long)s.available_bikes)
             };
 
-            return Task.FromResult(summary); // Devolvemos el DTO
+            return Task.FromResult(summary);
         }
 
         // =============================================================
-        // SYNCHRONOUS IMPLEMENTATIONS (IStationRepository)
+        // SYNCHRONOUS IMPLEMENTATIONS (IStationRepository - V1)
         // =============================================================
 
         public IEnumerable<Models.Bike> GetAll() => _store.Values.OrderBy(b => b.number);
@@ -158,7 +155,7 @@ namespace fs_2025_assessment_1_80457.Services
         public bool Update(int number, Models.Bike bike)
         {
             if (bike == null) throw new ArgumentNullException(nameof(bike));
-            // Uses AddOrUpdate for concurrent update logic
+            // Uses AddOrUpdate for concurrent update logic.
             return _store.AddOrUpdate(number, bike, (_, __) => bike) != null;
         }
 
@@ -167,6 +164,7 @@ namespace fs_2025_assessment_1_80457.Services
             return _store.TryRemove(number, out _);
         }
 
+        // Performs an atomic replacement of all data, used by the Background Service.
         public void ReplaceAll(IEnumerable<Models.Bike> bike)
         {
             if (bike == null) throw new ArgumentNullException(nameof(bike));

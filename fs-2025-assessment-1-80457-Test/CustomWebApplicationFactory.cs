@@ -1,35 +1,31 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using fs_2025_assessment_1_80457.Services;
-using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using System.IO; // Asegúrate de que este 'using' esté presente
-using System.Reflection; // Asegúrate de que este 'using' esté presente
+using System.IO;
+using System.Reflection;
 using Microsoft.Extensions.Hosting;
+using fs_2025_assessment_1_80457.Services;
 
 namespace fs_2025_assessment_1_80457_Test
 {
+    // Custom factory for integration tests to configure the application's host.
     public class CustomWebApplicationFactory<TProgram> : WebApplicationFactory<TProgram> where TProgram : class
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             // =========================================================================
-            // 💡 SOLUCIÓN DEFINITIVA DE RUTA 💡
-            // Usamos la ubicación donde se compiló TProgram (el .dll) como Content Root.
-            // Esto es 100% preciso e independiente de dónde se ejecute dotnet test.
+            // DEFINITIVE PATH SOLUTION
+            // Use the location where TProgram was compiled (.dll) as the Content Root.
+            // This is 100% accurate and independent of where dotnet test is executed.
             // =========================================================================
             var assembly = typeof(TProgram).Assembly;
             var assemblyPath = Path.GetDirectoryName(assembly.Location);
 
-            // 1. Establece la ruta de contenido al directorio de salida de la aplicación principal (donde está el .dll)
+            // 1. Set the content root path to the main application's output directory (where the .dll is)
             builder.UseContentRoot(assemblyPath!);
 
-            // 2. Asegura que el ensamblado se cargue correctamente
+            // 2. Ensure the assembly is loaded correctly
             builder.UseSetting(
                 WebHostDefaults.ApplicationKey,
                 assembly.FullName
@@ -39,11 +35,12 @@ namespace fs_2025_assessment_1_80457_Test
 
             builder.ConfigureServices(services =>
             {
-                // ... (Tu código de Mocking existente)
+                // Remove the production services that connect to the actual database
                 services.RemoveAll(typeof(ICosmosDbRepository));
                 services.RemoveAll(typeof(IStationRepository));
 
-                // Registrar una única instancia de InMemoryStationRepository y mapear interfaces a ella
+                // Register a single instance of InMemoryStationRepository and map interfaces to it.
+                // This uses an in-memory repository for testing purposes.
                 services.AddSingleton<InMemoryStationRepository>();
                 services.AddSingleton<IStationRepository>(sp => sp.GetRequiredService<InMemoryStationRepository>());
                 services.AddSingleton<ICosmosDbRepository>(sp => sp.GetRequiredService<InMemoryStationRepository>());
@@ -52,10 +49,10 @@ namespace fs_2025_assessment_1_80457_Test
 
         protected override IHost CreateHost(IHostBuilder builder)
         {
-            // Construimos y arrancamos el host en proceso para evitar que el testhost
-            // externo (DefaultEngineInvoker) espere argumentos como --parentprocessid.
+            // Build and start the host in-process to prevent the external testhost
+            // from waiting for arguments like --parentprocessid.
             var host = builder.Build();
-            // Arranca sincrónicamente (StartAsync para evitar deadlocks).
+            // Start synchronously (using GetResult for StartAsync to prevent deadlocks).
             host.StartAsync().GetAwaiter().GetResult();
             return host;
         }

@@ -19,11 +19,11 @@ namespace fs_2025_assessment_1_80457.Services
             logger.LogInformation("Cosmos DB Repository initialized for container: {container}", config.ContainerName);
         }
 
-        // ====================================================================
-        // MÉTODOS CRUD (Mantenidos)
-        // ====================================================================
+        // ====================================================================
+        // CRUD METHODS
+        // ====================================================================
 
-        public async Task<IEnumerable<Bike>> GetAllAsync()
+        public async Task<IEnumerable<Bike>> GetAllAsync()
         {
             var query = _container.GetItemQueryIterator<Bike>("SELECT * FROM c");
             var results = new List<Bike>();
@@ -38,7 +38,7 @@ namespace fs_2025_assessment_1_80457.Services
         public async Task<Bike?> GetByNumberAsync(int number)
         {
             var sqlQuery = new QueryDefinition("SELECT * FROM c WHERE c.number = @stationNumber")
-             .WithParameter("@stationNumber", number);
+               .WithParameter("@stationNumber", number);
 
             using var query = _container.GetItemQueryIterator<Bike>(sqlQuery);
             if (query.HasMoreResults)
@@ -50,19 +50,19 @@ namespace fs_2025_assessment_1_80457.Services
 
         public async Task AddAsync(Bike station)
         {
-            // Utilizamos el 'number' como Partition Key (según la lógica del controlador)
-            await _container.UpsertItemAsync(station, new PartitionKey(station.number));
+            // Use 'number' as the Partition Key.
+            await _container.UpsertItemAsync(station, new PartitionKey(station.number));
         }
 
         public async Task<bool> UpdateAsync(int number, Bike station)
         {
             try
             {
-                // Aseguramos que existe antes de reemplazar
-                await _container.ReadItemAsync<Bike>(station.id, new PartitionKey(number));
+                // Verify item exists before replacing (optional, but safer).
+                await _container.ReadItemAsync<Bike>(station.id, new PartitionKey(number));
 
-                // Reemplazamos el item usando el ID y la Partition Key
-                await _container.ReplaceItemAsync(station, station.id, new PartitionKey(number));
+                // Replace the item using its ID and Partition Key.
+                await _container.ReplaceItemAsync(station, station.id, new PartitionKey(number));
                 return true;
             }
             catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -75,9 +75,8 @@ namespace fs_2025_assessment_1_80457.Services
         {
             try
             {
-                // ✅ CORRECCIÓN: Usamos DeleteItemAsync con el ID (asumiendo que es el string del number) 
-                // y la Partition Key (el number mismo)
-                await _container.DeleteItemAsync<Bike>(number.ToString(), new PartitionKey(number));
+                // Delete the item using its ID (number as string) and Partition Key (number).
+                await _container.DeleteItemAsync<Bike>(number.ToString(), new PartitionKey(number));
                 return true;
             }
             catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -86,29 +85,29 @@ namespace fs_2025_assessment_1_80457.Services
             }
         }
 
-        // ====================================================================
-        // ✅ 7. IMPLEMENTACIÓN SearchStationsAdvancedAsync (V2 Eficiente)
-        // ====================================================================
+        // ====================================================================
+        // ADVANCED SEARCH (V2 Implementation)
+        // ====================================================================
 
-        public async Task<IEnumerable<Bike>> SearchStationsAdvancedAsync(
-      string? q, string? status, int? minBikes,
-      string? sortBy, string? dir, int page, int pageSize)
+        public async Task<IEnumerable<Bike>> SearchStationsAdvancedAsync(
+        string? q, string? status, int? minBikes,
+        string? sortBy, string? dir, int page, int pageSize)
         {
-            // ⚠️ NOTA CRÍTICA: La implementación real aquí DEBE construir una consulta 
-            // SQL de Cosmos DB (SELECT... FROM c WHERE... ORDER BY... OFFSET x LIMIT y).
-            // La siguiente es una implementación funcional que cumple la firma, pero delega 
-            // la lógica real de filtrado al repositorio base (GetAllAsync) para compilar.
+            // CRITICAL NOTE: The true efficient implementation MUST construct a single Cosmos DB SQL query 
+            // (SELECT... FROM c WHERE... ORDER BY... OFFSET x LIMIT y).
+            // The current implementation is a placeholder that fetches all data and filters/sorts in memory 
+            // (using LINQ to Objects on the result of GetAllAsync) for compilation purposes.
 
-            // --- IMPLEMENTACIÓN INICIAL PARA COMPILAR (DEBE SER REEMPLAZADA) ---
-            var stations = (await GetAllAsync() ?? Enumerable.Empty<Bike>()).AsQueryable();
+            // --- PLACEHOLDER IMPLEMENTATION (TO BE REPLACED WITH EFFICIENT COSMOS DB QUERY LOGIC) ---
+            var stations = (await GetAllAsync() ?? Enumerable.Empty<Bike>()).AsQueryable();
 
-            // 1. Filtrado y Búsqueda (Placeholder: Idealmente, esto sería parte del WHERE en la consulta SQL)
-            if (!string.IsNullOrWhiteSpace(q))
+            // 1. Filtering and Search (In-memory filtering)
+            if (!string.IsNullOrWhiteSpace(q))
             {
                 string lowerQuery = q.ToLowerInvariant();
                 stations = stations.Where(s =>
-                  (!string.IsNullOrEmpty(s.name) && s.name.ToLowerInvariant().Contains(lowerQuery)) ||
-                  (!string.IsNullOrEmpty(s.address) && s.address.ToLowerInvariant().Contains(lowerQuery)));
+                    (!string.IsNullOrEmpty(s.name) && s.name.ToLowerInvariant().Contains(lowerQuery)) ||
+                    (!string.IsNullOrEmpty(s.address) && s.address.ToLowerInvariant().Contains(lowerQuery)));
             }
 
             if (!string.IsNullOrWhiteSpace(status))
@@ -122,8 +121,8 @@ namespace fs_2025_assessment_1_80457.Services
                 stations = stations.Where(s => s.available_bikes >= minBikes.Value);
             }
 
-            // 2. Ordenamiento
-            stations = sortBy?.ToLowerInvariant() switch
+            // 2. Sorting (In-memory sorting)
+            stations = sortBy?.ToLowerInvariant() switch
             {
                 "name" => (dir?.ToLowerInvariant() == "desc" ? stations.OrderByDescending(s => s.name ?? string.Empty) : stations.OrderBy(s => s.name ?? string.Empty)),
                 "bikes" => (dir?.ToLowerInvariant() == "desc" ? stations.OrderByDescending(s => s.available_bikes) : stations.OrderBy(s => s.available_bikes)),
@@ -131,8 +130,8 @@ namespace fs_2025_assessment_1_80457.Services
                 _ => (dir?.ToLowerInvariant() == "desc" ? stations.OrderByDescending(s => s.number) : stations.OrderBy(s => s.number)),
             };
 
-            // 3. Paginación
-            if (page < 1) page = 1;
+            // 3. Pagination (In-memory pagination)
+            if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
 
             return stations
@@ -140,31 +139,31 @@ namespace fs_2025_assessment_1_80457.Services
               .Take(pageSize)
               .ToList();
 
-            // --- FIN IMPLEMENTACIÓN INICIAL PARA COMPILAR ---
-        }
+            // --- END PLACEHOLDER IMPLEMENTATION ---
+        }
 
-        // ====================================================================
-        // ✅ 8. IMPLEMENTACIÓN GetSummaryAsync (V2 Eficiente) - CORREGIDO
-        // ====================================================================
+        // ====================================================================
+        // SUMMARY AGGREGATION (V2 Efficient Implementation)
+        // ====================================================================
 
-        // ⚠️ CAMBIO CLAVE 1: Cambiar la firma a Task<SummaryResponse> (requiere que exista el DTO y la interfaz actualizada)
-        public async Task<SummaryResponse> GetSummaryAsync()
+        public async Task<SummaryResponse> GetSummaryAsync()
         {
-            // Consulta SQL corregida para usar alias, no SELECT VALUE { ... }
-            var sqlQuery = new QueryDefinition(
-        "SELECT COUNT(1) AS totalStations, " +
-        "SUM(c.bike_stands) AS totalBikeStands, " +
-        "SUM(c.available_bikes) AS totalAvailableBikes " +
-        "FROM c"
-      );
+            // SQL query for efficient server-side aggregation.
+            var sqlQuery = new QueryDefinition(
+                "SELECT VALUE { " +
+                "totalStations: COUNT(1), " +
+                "totalBikeStands: SUM(c.bike_stands), " +
+                "totalAvailableBikes: SUM(c.available_bikes) " +
+                "} FROM c"
+            );
 
-            // ⚠️ CAMBIO CLAVE 2: Usamos SummaryResponse para que Cosmos sepa cómo deserializar el resultado.
-            using var query = _container.GetItemQueryIterator<SummaryResponse>(sqlQuery);
+            // Use SummaryResponse to let Cosmos deserialize the single aggregated result.
+            using var query = _container.GetItemQueryIterator<SummaryResponse>(sqlQuery);
             if (query.HasMoreResults)
             {
                 var response = await query.ReadNextAsync();
 
-                // ⚠️ CAMBIO CLAVE 3: Devolvemos el DTO. El operador de null-coalescing (??) devuelve un nuevo DTO si la respuesta es vacía.
+                // Return the DTO or a new empty DTO if the response is empty.
                 return response.FirstOrDefault() ?? new SummaryResponse();
             }
 

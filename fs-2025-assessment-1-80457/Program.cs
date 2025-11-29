@@ -1,35 +1,29 @@
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
-using fs_2025_assessment_1_80457.Background;
 using fs_2025_assessment_1_80457.Models;
 using fs_2025_assessment_1_80457.Services;
 using Microsoft.OpenApi.Models;
 using System.Text.Json;
-using System.Text.Json.Serialization; // Necesario si quieres usar JsonNamingPolicy
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ===================================
-// 1. CONFIGURACIÓN DE SERVICIOS
+// 1. SERVICES CONFIGURATION
 // ===================================
 
-// ? CORRECCIÓN CRÍTICA: Se agrega AddJsonOptions para configurar la deserialización JSON.
-// Esto garantiza que el JSON entrante (típicamente en camelCase) se mapee correctamente
-// a las propiedades de C# (PascalCase), resolviendo los problemas de [FromBody] y Swagger.
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // 1. Usa camelCase para el mapeo de propiedades (ej: "available_bikes" -> available_bikes).
-        // Las propiedades con [JsonPropertyName] se respetarán.
+        // CRITICAL: Configure JSON deserialization for input (camelCase to PascalCase mapping).
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-
-        // 2. Opcional: Asegura el correcto manejo de enums como cadenas, no como números.
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
+// Configuration mapping for Cosmos DB settings
 builder.Services.Configure<CosmosDbSettings>(builder.Configuration.GetSection("CosmosDb"));
 
-// --- Servicios Esenciales ---
+// --- Core Services ---
 builder.Services.AddSingleton<IStationRepository, InMemoryStationRepository>();
 builder.Services.AddMemoryCache();
 
@@ -38,13 +32,13 @@ builder.Services.AddSingleton<IStationService, StationService>();
 
 // V2 Repository (Cosmos DB)
 builder.Services.AddSingleton<ICosmosDbRepository, CosmosDbStationRepository>();
-// ?? Tarea pendiente: Considera crear IStationServiceV2 para manejar caché sobre CosmosDB
+// Note: Consider creating IStationServiceV2 for handling caching/logic over CosmosDB.
 
-// Background Service
+// Background Service for data updates
 builder.Services.AddHostedService<fs_2025_assessment_1_80457.Background.BikeUpdateService>();
 
 // ===================================
-// 2. CONFIGURACIÓN DE VERSIONAMIENTO (V1 & V2)
+// 2. API VERSIONING CONFIGURATION (V1 & V2)
 // ===================================
 
 builder.Services.AddApiVersioning(options =>
@@ -53,9 +47,8 @@ builder.Services.AddApiVersioning(options =>
     options.DefaultApiVersion = new ApiVersion(1, 0);
     options.ReportApiVersions = true;
 
-    // ? CORRECCIÓN: Usamos solo el lector de segmento de URL para evitar la doble versión requerida en Swagger.
+    // Use only URL segment reader for versioning
     options.ApiVersionReader = new UrlSegmentApiVersionReader();
-
 })
 .AddMvc()
 .AddApiExplorer(options =>
@@ -65,7 +58,7 @@ builder.Services.AddApiVersioning(options =>
 });
 
 // ===================================
-// 3. CONFIGURACIÓN DE SWAGGER PARA MULTIPLES VERSIONES
+// 3. SWAGGER/OPENAPI CONFIGURATION
 // ===================================
 builder.Services.AddSwaggerGen(options =>
 {
@@ -78,14 +71,14 @@ builder.Services.AddSwaggerGen(options =>
         {
             Title = $"Dublin Bikes API {description.ApiVersion}",
             Version = description.ApiVersion.ToString(),
-            Description = description.IsDeprecated ? "Esta versión está obsoleta." : null
+            Description = description.IsDeprecated ? "This API version is deprecated." : null
         });
     }
 });
 
 var app = builder.Build();
 
-// Lógica de Seeding de Cosmos DB (Mantenida)
+// Cosmos DB Seeding Logic (Run once on startup)
 using (var scope = app.Services.CreateScope())
 {
     var cosmosRepo = scope.ServiceProvider.GetRequiredService<ICosmosDbRepository>();
@@ -100,11 +93,11 @@ using (var scope = app.Services.CreateScope())
 
         if (bikes != null && bikes.Count > 1)
         {
-            // Nota: En un sistema real, harías una comprobación COUNT antes de insertar.
             logger.LogInformation("Attempting to seed {count} documents into Cosmos DB Emulator...", bikes.Count);
 
             foreach (var bike in bikes)
             {
+                // Assign 'number' as the Cosmos DB ID/Partition Key
                 bike.id = bike.number.ToString();
                 await cosmosRepo.AddAsync(bike);
             }
@@ -113,12 +106,12 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "ERROR during Cosmos DB Seeding. Check Emulador status and appsettings.");
+        logger.LogError(ex, "ERROR during Cosmos DB Seeding. Check Emulator status and appsettings.");
     }
 }
 
 // ===================================
-// 4. CONFIGURACIÓN DEL PIPELINE HTTP
+// 4. HTTP REQUEST PIPELINE
 // ===================================
 
 if (app.Environment.IsDevelopment())

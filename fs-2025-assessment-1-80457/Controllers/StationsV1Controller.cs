@@ -9,7 +9,7 @@ namespace fs_2025_assessment_1_80457.Controllers
     [ApiVersion(1.0)]
     public class StationsV1Controller : ControllerBase
     {
-        // 🚨 Inyectamos el Servicio, NO el Repositorio
+        // Inject the service layer (IStationService).
         private readonly IStationService _service;
 
         public StationsV1Controller(IStationService service)
@@ -17,7 +17,7 @@ namespace fs_2025_assessment_1_80457.Controllers
             _service = service;
         }
 
-        // 1. GET /api/v1/stations (Listado con filtros, ordenación y paginación)
+        // GET /api/v1/stations (List with filters, sorting, and pagination)
         [HttpGet]
         public IActionResult GetStations(
             [FromQuery] string? q = null,
@@ -30,11 +30,10 @@ namespace fs_2025_assessment_1_80457.Controllers
         {
             var stations = _service.GetStationsAdvanced(q, status, minBikes, sort, dir, page, pageSize);
 
-            // Nota: En una API de producción, devolverías aquí un DTO de paginación
             return Ok(stations);
         }
 
-        // Add compatibility route so tests that call /search still work
+        // Add compatibility route so tests that call /search still work.
         [HttpGet("search")]
         public IActionResult SearchStations(
             [FromQuery] string? q = null,
@@ -45,21 +44,21 @@ namespace fs_2025_assessment_1_80457.Controllers
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = int.MaxValue)
         {
-            // Map incoming "sortBy" query parameter to the internal "sort" parameter
+            // Map incoming "sortBy" query parameter to the internal "sort" parameter.
             var sort = string.IsNullOrEmpty(sortBy) ? null : sortBy;
             return GetStations(q, status, minBikes, sort, dir, page, pageSize);
         }
 
-        // 2. GET /api/v1/stations/{number} (Detalle)
+        // GET /api/v1/stations/{number} (Detail)
         [HttpGet("{number:int}")]
         public IActionResult GetStationByNumber(int number)
         {
             var station = _service.GetStationByNumber(number);
-            // Retorna 404 si la estación no existe
+            // Returns 404 Not Found if the station does not exist.
             return station == null ? NotFound() : Ok(station);
         }
 
-        // 3. GET /api/v1/stations/summary (Resumen/Agregado)
+        // GET /api/v1/stations/summary (Aggregate Summary)
         [HttpGet("summary")]
         public IActionResult GetSummary()
         {
@@ -67,7 +66,7 @@ namespace fs_2025_assessment_1_80457.Controllers
             return Ok(summary);
         }
 
-        // 4. POST /api/v1/stations (Creación)
+        // POST /api/v1/stations (Creation)
         [HttpPost]
         public IActionResult AddStation([FromBody] Models.Bike station)
         {
@@ -75,11 +74,11 @@ namespace fs_2025_assessment_1_80457.Controllers
 
             _service.AddStation(station);
 
-            // Retorna 201 Created y la ubicación del nuevo recurso
+            // Returns 201 Created and the location of the new resource.
             return CreatedAtAction(nameof(GetStationByNumber), new { number = station.number, version = "1.0" }, station);
         }
 
-        // 5. PUT /api/v1/stations/{number} (Actualización)
+        // PUT /api/v1/stations/{number} (Update)
         [HttpPut("{number:int}")]
         public IActionResult UpdateStation(int number, [FromBody] Models.Bike station)
         {
@@ -90,13 +89,13 @@ namespace fs_2025_assessment_1_80457.Controllers
 
             if (!_service.UpdateStation(number, station))
             {
-                return NotFound(); // Retorna 404 si la estación a actualizar no existe
+                return NotFound(); // Returns 404 Not Found if the station to update does not exist.
             }
 
-            return NoContent(); // Retorna 204 No Content para una actualización exitosa
+            return NoContent(); // Returns 204 No Content for a successful update.
         }
 
-        // 6. DELETE /api/v1/stations/{number} (Eliminación)
+        // DELETE /api/v1/stations/{number} (Deletion)
         [HttpDelete("{number:int}")]
         public IActionResult DeleteStation(int number)
         {

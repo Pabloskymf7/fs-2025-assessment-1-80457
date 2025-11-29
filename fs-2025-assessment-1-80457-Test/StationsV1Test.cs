@@ -4,12 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
-using System.Text;
 using System.Threading.Tasks;
+using Xunit; // Needed for [Fact] and IClassFixture
 
 namespace fs_2025_assessment_1_80457_Test
 {
-    // Usamos IClassFixture para que Xunit cree una instancia de la aplicación web de prueba.
+    // Use IClassFixture to let Xunit create a single instance of the test web application factory.
     public class StationsV1Tests : IClassFixture<CustomWebApplicationFactory<Program>>
     {
         private readonly CustomWebApplicationFactory<Program> _factory;
@@ -19,30 +19,32 @@ namespace fs_2025_assessment_1_80457_Test
         public StationsV1Tests(CustomWebApplicationFactory<Program> factory)
         {
             _factory = factory;
-            _client = factory.CreateClient(); // Crea un cliente HTTP para interactuar con la app de prueba.
+            // Create an HTTP client configured to interact with the test application.
+            _client = factory.CreateClient();
         }
 
         // =============================================================
-        // PRUEBAS DE RECUPERACIÓN (GET)
+        // RETRIEVAL TESTS (GET)
         // =============================================================
 
         [Fact]
         public async Task Get_ReturnsSuccessAndAllStations()
         {
-            // Act: Llamar al endpoint GET V1
+            // Act: Call the GET V1 endpoint
             var response = await _client.GetAsync(V1_BASE_URL);
 
             // Assert
-            response.EnsureSuccessStatusCode(); // Código 2xx
+            response.EnsureSuccessStatusCode(); // Expect a 2xx status code
             var stations = await response.Content.ReadFromJsonAsync<List<Bike>>();
             Assert.NotNull(stations);
-            Assert.True(stations.Count > 50); // El archivo dublinbike.json tiene > 50 estaciones
+            // The in-memory database is initialized with > 50 stations from the dublinbike.json file
+            Assert.True(stations.Count > 50);
         }
 
         [Fact]
         public async Task GetByNumber_ReturnsStation()
         {
-            // Act: Buscamos una estación que sabemos que existe
+            // Act: Search for a known existing station
             var response = await _client.GetAsync($"{V1_BASE_URL}/1");
 
             // Assert
@@ -63,7 +65,7 @@ namespace fs_2025_assessment_1_80457_Test
         }
 
         // =============================================================
-        // PRUEBAS DE MUTACIÓN (POST, PUT, DELETE)
+        // MUTATION TESTS (POST, PUT, DELETE)
         // =============================================================
 
         [Fact]
@@ -75,10 +77,10 @@ namespace fs_2025_assessment_1_80457_Test
             // Act
             var response = await _client.PostAsJsonAsync(V1_BASE_URL, newStation);
 
-            // Assert: Verificamos que se haya creado
+            // Assert: Verify creation status code
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-            // Verificamos que se pueda recuperar
+            // Verify station can be retrieved
             var getResponse = await _client.GetAsync($"{V1_BASE_URL}/999");
             getResponse.EnsureSuccessStatusCode();
         }
@@ -86,19 +88,20 @@ namespace fs_2025_assessment_1_80457_Test
         [Fact]
         public async Task Put_UpdatesExistingStation()
         {
-            // Arrange: Primero creamos una estación de prueba
+            // Arrange: First, create a test station
             var initialStation = new Bike { number = 888, name = "Initial V1", id = "888" };
             await _client.PostAsJsonAsync(V1_BASE_URL, initialStation);
 
-            // Arrange: Definimos la estación actualizada
+            // Arrange: Define the updated station object
             var updatedStation = new Bike { number = 888, name = "Updated V1", id = "888" };
 
-            // Act: Enviamos la actualización
+            // Act: Send the update request
             var response = await _client.PutAsJsonAsync($"{V1_BASE_URL}/888", updatedStation);
 
-            // Assert: Verificamos el código 204 y que el nombre se haya cambiado
+            // Assert: Verify 204 No Content status code
             Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
+            // Verify the name has been updated
             var getResponse = await _client.GetAsync($"{V1_BASE_URL}/888");
             var result = await getResponse.Content.ReadFromJsonAsync<Bike>();
             Assert.Equal("Updated V1", result?.name);
@@ -107,28 +110,30 @@ namespace fs_2025_assessment_1_80457_Test
         [Fact]
         public async Task Delete_RemovesStation()
         {
-            // Arrange: Creamos una estación para borrar
+            // Arrange: Create a station to delete
             var stationToDelete = new Bike { number = 777, name = "Delete V1", id = "777" };
             await _client.PostAsJsonAsync(V1_BASE_URL, stationToDelete);
 
-            // Act: Borramos
+            // Act: Delete the station
             var response = await _client.DeleteAsync($"{V1_BASE_URL}/777");
 
-            // Assert: Verificamos el código 204 y que ya no exista
+            // Assert: Verify 204 No Content status code
             Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+            // Verify the station is now gone (404 Not Found)
             var getResponse = await _client.GetAsync($"{V1_BASE_URL}/777");
             Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
         }
 
         // =============================================================
-        // PRUEBA DE BÚSQUEDA
+        // SEARCH TEST
         // =============================================================
 
         [Fact]
         public async Task Search_ReturnsFilteredAndPagedResults()
         {
-            // Arrange: La base de datos en memoria está inicializada con datos de Dublin.
-            // Act: Buscar estaciones "OPEN" y ordenar por nombre (name).
+            // Arrange: The in-memory database is initialized with Dublin data.
+            // Act: Search for "OPEN" stations, sort by name, and limit to 5 results (pageSize=5).
             var response = await _client.GetAsync($"{V1_BASE_URL}/search?status=OPEN&sortBy=name&pageSize=5");
 
             // Assert
@@ -136,10 +141,10 @@ namespace fs_2025_assessment_1_80457_Test
             var stations = await response.Content.ReadFromJsonAsync<List<Bike>>();
 
             Assert.NotNull(stations);
-            Assert.True(stations.Count <= 5); // Verifica paginación
-            Assert.True(stations.All(s => s.status == "OPEN")); // Verifica filtrado
+            Assert.True(stations.Count <= 5); // Verify pagination
+            Assert.True(stations.All(s => s.status == "OPEN")); // Verify filtering
 
-            // Verifica ordenamiento (los nombres deberían estar en orden alfabético)
+            // Verify sorting (names should be in alphabetical order)
             var names = stations.Select(s => s.name).ToList();
             var sortedNames = names.OrderBy(n => n).ToList();
             Assert.Equal(sortedNames, names);
