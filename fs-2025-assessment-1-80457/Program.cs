@@ -5,6 +5,7 @@ using fs_2025_assessment_1_80457.Models;
 using fs_2025_assessment_1_80457.Services;
 using Microsoft.OpenApi.Models;
 using System.Text.Json;
+using System.Text.Json.Serialization; // Necesario si quieres usar JsonNamingPolicy
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,7 +13,20 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. CONFIGURACIÓN DE SERVICIOS
 // ===================================
 
-builder.Services.AddControllers();
+// ? CORRECCIÓN CRÍTICA: Se agrega AddJsonOptions para configurar la deserialización JSON.
+// Esto garantiza que el JSON entrante (típicamente en camelCase) se mapee correctamente
+// a las propiedades de C# (PascalCase), resolviendo los problemas de [FromBody] y Swagger.
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // 1. Usa camelCase para el mapeo de propiedades (ej: "available_bikes" -> available_bikes).
+        // Las propiedades con [JsonPropertyName] se respetarán.
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+
+        // 2. Opcional: Asegura el correcto manejo de enums como cadenas, no como números.
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
+
 builder.Services.Configure<CosmosDbSettings>(builder.Configuration.GetSection("CosmosDb"));
 
 // --- Servicios Esenciales ---
