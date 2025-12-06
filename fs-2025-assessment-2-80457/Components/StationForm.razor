@@ -4,6 +4,7 @@
 @inject IStationsApiClient ApiClient
 
 @code {
+    // Clase de modelo para el formulario
     public class StationFormModel
     {
         // Campos requeridos y con validación mínima
@@ -48,7 +49,7 @@
 <div class="card p-4 shadow">
     <h4>@(Model.IsNew ? "Crear Nueva Estación" : $"Editar Estación {Model.Number}")</h4>
 
-    <EditForm Model="Model" OnValidSubmit="HandleValidSubmit" FormName="StationEditForm">
+    <EditForm Model="Model" OnValidSubmit="HandleValidSubmit" OnInvalidSubmit="HandleInvalidSubmit" FormName="StationEditForm">
         <DataAnnotationsValidator />
         <ValidationSummary />
 
@@ -110,7 +111,7 @@
             <button type="submit" class="btn btn-success">
                 @(Model.IsNew ? "Crear Estación" : "Guardar Cambios")
             </button>
-            <button type="button" class="btn btn-secondary" @onclick="OnCancel">
+            <button type="button" class="btn btn-secondary" @onclick="HandleCancelClick">
                 Cancelar
             </button>
         </div>
@@ -139,6 +140,21 @@
 
     private string? feedbackMessage;
     private string feedbackCssClass = "alert-info";
+
+    // Manejador si la validación del formulario NO ES exitosa.
+    private void HandleInvalidSubmit()
+    {
+        // 🚨🚨🚨 PUNTO DE INTERRUPCIÓN PARA FALLOS DE VALIDACIÓN 🚨🚨🚨
+        feedbackMessage = "❌ Por favor, corrige los errores de validación del formulario.";
+        feedbackCssClass = "alert-danger";
+    }
+
+    // Manejador para el botón de Cancelar
+    private async Task HandleCancelClick()
+    {
+        await OnCancel.InvokeAsync();
+    }
+
 
     // Maneja la sumisión del formulario cuando la validación es exitosa.
     private async Task HandleValidSubmit()
@@ -187,6 +203,7 @@
         }
         catch (HttpRequestException ex)
         {
+            // 🚨🚨🚨 PUNTO DE INTERRUPCIÓN PARA FALLOS DE API 🚨🚨🚨
             // Manejo de errores de la API (ej: 404, 400)
             feedbackMessage = $"❌ Error de API: {ex.Message}";
             feedbackCssClass = "alert-danger";
