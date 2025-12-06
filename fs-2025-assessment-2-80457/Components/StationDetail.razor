@@ -1,4 +1,5 @@
 ﻿@using Humanizer
+@using System.Globalization
 @using fs_2025_assessment_1_80457.Models
 
 @if (Station != null)
@@ -32,7 +33,7 @@
 				<dt class="col-sm-3">Last Update</dt>
 				<dd class="col-sm-9">
 					@Station.LastUpdateLocal.ToString("g")
-					(@TimeSpan.FromSeconds((DateTimeOffset.Now - Station.LastUpdateLocal).TotalSeconds).Humanize() ago)
+					(@TimeSpan.FromSeconds((DateTimeOffset.Now - Station.LastUpdateLocal).TotalSeconds).Humanize(culture: new CultureInfo("en-US")) ago)
 				</dd>
 
 				<dt class="col-sm-3">Coordinates</dt>
