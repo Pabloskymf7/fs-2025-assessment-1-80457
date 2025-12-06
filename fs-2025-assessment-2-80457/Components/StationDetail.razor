@@ -3,85 +3,83 @@
 
 @if (Station != null)
 {
-    <div class="card bg-light mt-4 shadow-sm">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h3 class="mb-0">Detalle de la Estación: @Station.name [cite: 32]</h3>
-            <button type="button" class="btn-close" aria-label="Cerrar" @onclick="OnClose"></button>
-        </div>
-        <div class="card-body">
-            <dl class="row">
-                <dt class="col-sm-3">Dirección</dt>
-                <dd class="col-sm-9">@Station.address</dd>
+	<div class="card bg-light mt-4 shadow-sm">
+		<div class="card-header d-flex justify-content-between align-items-center">
+			<h3 class="mb-0">Station Detail: @Station.name</h3>
+			<button type="button" class="btn-close" aria-label="Close" @onclick="OnClose"></button>
+		</div>
+		<div class="card-body">
+			<dl class="row">
+				<dt class="col-sm-3">Address</dt>
+				<dd class="col-sm-9">@Station.address</dd>
 
-                <dt class="col-sm-3">Estado</dt>
-                <dd class="col-sm-9">
-                    <span class="badge @(Station.status == "OPEN" ? "bg-success" : "bg-danger")">
-                        @Station.status [cite: 33]
-                    </span>
-                </dd>
+				<dt class="col-sm-3">Status</dt>
+				<dd class="col-sm-9">
+					<span class="badge @(Station.status == "OPEN" ? "bg-success" : "bg-danger")">
+						@Station.status
+					</span>
+				</dd>
 
-                <dt class="col-sm-3">Capacidad Total</dt>
-                <dd class="col-sm-9">@(Station.bike_stands + Station.available_bike_stands) [cite: 34]</dd>
+				<dt class="col-sm-3">Total Capacity</dt>
+				<dd class="col-sm-9">@(Station.bike_stands + Station.available_bike_stands)</dd>
 
-                <dt class="col-sm-3">Bicicletas Disponibles</dt>
-                <dd class="col-sm-9">@Station.available_bikes [cite: 34]</dd>
+				<dt class="col-sm-3">Available Bikes</dt>
+				<dd class="col-sm-9">@Station.available_bikes</dd>
 
-                <dt class="col-sm-3">Espacios Libres</dt>
-                <dd class="col-sm-9">@Station.available_bike_stands [cite: 34]</dd>
+				<dt class="col-sm-3">Available Stands</dt>
+				<dd class="col-sm-9">@Station.available_bike_stands</dd>
 
-                <dt class="col-sm-3">Última Actualización</dt>
-                <dd class="col-sm-9">
-                    @Station.LastUpdateLocal.ToString("g")
-                    (Hace @TimeSpan.FromSeconds((DateTimeOffset.Now - Station.LastUpdateLocal).TotalSeconds).Humanize()) [cite: 36]
-                </dd>
+				<dt class="col-sm-3">Last Update</dt>
+				<dd class="col-sm-9">
+					@Station.LastUpdateLocal.ToString("g")
+					(@TimeSpan.FromSeconds((DateTimeOffset.Now - Station.LastUpdateLocal).TotalSeconds).Humanize() ago)
+				</dd>
 
-                <dt class="col-sm-3">Coordenadas</dt>
-                <dd class="col-sm-9">
-                    @if (Station.position != null)
-                    {
-                        var linkUrl = $"https://www.google.com/maps/search/?api=1&query={Station.position.Lat},{Station.position.Lng}";
-                        <a href="@linkUrl" target="_blank" rel="noopener noreferrer">
-                            Lat: @Station.position.Lat, Lng: @Station.position.Lng [cite: 37]
-                        </a>
-                    }
-                    else
-                    {
-                        <span>N/A</span>
-                    }
-                </dd>
-            </dl>
+				<dt class="col-sm-3">Coordinates</dt>
+				<dd class="col-sm-9">
+					@if (Station.position != null)
+					{
+						var linkUrl = $"https://www.google.com/maps/search/?api=1&query={Station.position.Lat},{Station.position.Lng}";
+						<a href="@linkUrl" target="_blank" rel="noopener noreferrer">
+							Lat: @Station.position.Lat, Lng: @Station.position.Lng
+						</a>
+					}
+					else
+					{
+						<span>N/A</span>
+					}
+				</dd>
+			</dl>
 
-            <h4 class="mt-4">Ocupación [cite: 35]</h4>
-            @{
-                // Calcula el porcentaje de ocupación (bicis disponibles)
-                int occupancyPercent = (int)Math.Round(Station.Occupancy * 100);
-                string progressClass = occupancyPercent > 75 ? "bg-danger" :
-                occupancyPercent > 50 ? "bg-warning text-dark" :
-                "bg-success";
-            }
-            <div class="progress" role="progressbar" aria-label="Ocupación de la Estación"
-                 aria-valuenow="@occupancyPercent" aria-valuemin="0" aria-valuemax="100">
-                <div class="progress-bar @progressClass" style="width: @occupancyPercent%">
-                    @(occupancyPercent)% Lleno
-                </div>
-            </div>
-            <small class="text-muted" aria-hidden="true">
-                @Station.available_bikes de @(Station.bike_stands + Station.available_bike_stands) espacios ocupados.
-            </small>
+			<h4 class="mt-4">Occupancy</h4>
+			@{
+				// Calculates the occupancy percentage (available bikes)
+				int occupancyPercent = (int)Math.Round(Station.Occupancy * 100);
+				string progressClass = occupancyPercent > 75 ? "bg-danger" :
+				occupancyPercent > 50 ? "bg-warning text-dark" :
+				"bg-success";
+			}
+			<div class="progress" role="progressbar" aria-label="Station Occupancy"
+				          aria-valuenow="@occupancyPercent" aria-valuemin="0" aria-valuemax="100">
+				<div class="progress-bar @progressClass" style="width: @occupancyPercent%">
+					@(occupancyPercent)% Full
+				</div>
+			</div>
+			<small class="text-muted" aria-hidden="true">
+				@Station.available_bikes out of @(Station.bike_stands + Station.available_bike_stands) spaces occupied.
+			</small>
 
-        </div>
-    </div>
+		</div>
+	</div>
 }
 
 @code {
-    // Parámetro para la estación que se va a mostrar
-    [Parameter]
-    public Bike? Station { get; set; }
+	// Parameter for the station to be displayed
+	[Parameter]
+	public Bike? Station { get; set; }
 
-    // EventCallback para notificar a la página principal cuando se debe cerrar el detalle
-    [Parameter]
-    public EventCallback OnClose { get; set; }
+	// EventCallback to notify the main page when the detail should be closed
+	[Parameter]
+	public EventCallback OnClose { get; set; }
 
-    // Necesitas instalar el paquete 'Humanizer.Core' para el cálculo de la fecha.
-    // En la Consola del Administrador de Paquetes: Install-Package Humanizer.Core
 }

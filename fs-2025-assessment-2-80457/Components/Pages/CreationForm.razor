@@ -4,24 +4,24 @@
 @using fs_2025_assessment_2_80457.Services
 @inject NavigationManager NavManager
 
-<PageTitle>Crear Nueva Estación</PageTitle>
+<PageTitle>Create New Station</PageTitle>
 
-## ➕ Crear Nueva Estación
+## ➕ Create New Station
 
 <StationForm Model="_model" OnSubmitted="HandleSuccess" OnCancel="HandleCancel" />
 
 @code {
-    private StationForm.StationFormModel _model = new();
+	private StationForm.StationFormModel _model = new();
 
-    private void HandleSuccess()
-    {
-        // Redirigir a la lista de estaciones después de crear
-        NavManager.NavigateTo("/stations");
-    }
+	private void HandleSuccess()
+	{
+		// Redirect to the station list after creation
+		NavManager.NavigateTo("/stations");
+	}
 
-    private void HandleCancel()
-    {
-        // Redirigir a la lista si se cancela
-        NavManager.NavigateTo("/stations");
-    }
+	private void HandleCancel()
+	{
+		// Redirect to the list if cancelled
+		NavManager.NavigateTo("/stations");
+	}
 }

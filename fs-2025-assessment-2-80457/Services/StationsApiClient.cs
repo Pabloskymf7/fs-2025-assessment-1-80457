@@ -4,17 +4,17 @@ using ModelsV2 = fs_2025_assessment_2_80457.Models;
 
 namespace fs_2025_assessment_2_80457.Services
 {
-    // Define la interfaz para facilitar la inyección de dependencias y las pruebas.
-    public interface IStationsApiClient
+    // Defines the interface for dependency injection and testing purposes.
+    public interface IStationsApiClient
     {
         Task<ModelsV2.PagedResult<Bike>> GetStationsAsync(
-            int page = 1,
-            int pageSize = 10,
-            string? search = null,
-            string? status = null,
-            int? minBikes = null,
-            string? sortField = null,
-            bool isAscending = true
+          int page = 1,
+          int pageSize = 10,
+          string? search = null,
+          string? status = null,
+          int? minBikes = null,
+          string? sortField = null,
+          bool isAscending = true
         );
 
         Task<Bike?> GetStationByNumberAsync(int number);
@@ -27,35 +27,35 @@ namespace fs_2025_assessment_2_80457.Services
     {
         private readonly HttpClient _httpClient;
 
-        // La ruta base de la API V2 (debe coincidir con tu controlador: /api/v2/stations)
-        private const string V2_BASE_ROUTE = "/api/v2/stations";
+        // The base route for the V2 API (should match your controller: /api/v2/stations)
+        private const string V2_BASE_ROUTE = "/api/v2/stations";
 
         public StationsApiClient(HttpClient httpClient)
         {
             _httpClient = httpClient;
         }
 
-        // Obtiene una lista paginada y filtrada de estaciones.
-        public async Task<ModelsV2.PagedResult<Bike>> GetStationsAsync(
-            int page = 1,
-            int pageSize = 10,
-            string? search = null,
-            string? status = null,
-            int? minBikes = null,
-            string? sortField = null,
-            bool isAscending = true
-        )
+        // Retrieves a paginated and filtered list of stations.
+        public async Task<ModelsV2.PagedResult<Bike>> GetStationsAsync(
+      int page = 1,
+      int pageSize = 10,
+      string? search = null,
+      string? status = null,
+      int? minBikes = null,
+      string? sortField = null,
+      bool isAscending = true
+    )
         {
             var queryString = new List<string>
-            {
-                $"page={page}",
-                $"pageSize={pageSize}"
-            };
+      {
+        $"page={page}",
+        $"pageSize={pageSize}"
+      };
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                // El API V2 espera 'q' para el query de búsqueda
-                queryString.Add($"q={Uri.EscapeDataString(search)}");
+                // The V2 API expects 'q' for the search query
+                queryString.Add($"q={Uri.EscapeDataString(search)}");
             }
 
             if (!string.IsNullOrWhiteSpace(status))
@@ -70,40 +70,40 @@ namespace fs_2025_assessment_2_80457.Services
 
             if (!string.IsNullOrWhiteSpace(sortField))
             {
-                // Mapeo del campo de ordenación de la UI al API
-                var apiSortField = sortField.ToLowerInvariant() switch
+                // Mapping the UI sort field to the API field
+                var apiSortField = sortField.ToLowerInvariant() switch
                 {
                     "name" => "name",
                     "availablebikes" => "bikes",
                     _ => "number"
                 };
                 queryString.Add($"sortBy={apiSortField}");
-                // El API espera 'dir=asc' o 'dir=desc'
-                queryString.Add($"dir={(isAscending ? "asc" : "desc")}");
+                // The API expects 'dir=asc' or 'dir=desc'
+                queryString.Add($"dir={(isAscending ? "asc" : "desc")}");
             }
 
-            // Endpoint correcto de la API V2
-            var url = $"{V2_BASE_ROUTE}/search?{string.Join("&", queryString)}";
+            // Correct V2 API search endpoint
+            var url = $"{V2_BASE_ROUTE}/search?{string.Join("&", queryString)}";
 
             var response = await _httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
-            // *************************************************************************
-            // SOLUCIÓN AL ERROR 500 (JSON): Leer la respuesta como una LISTA de Bikes.
-            // *************************************************************************
-            var items = await response.Content.ReadFromJsonAsync<List<Bike>>();
+            // *************************************************************************
+            // JSON READING: Read the response as a LIST of Bikes.
+            // *************************************************************************
+            var items = await response.Content.ReadFromJsonAsync<List<Bike>>();
             var currentCount = items?.Count ?? 0;
 
-            // *************************************************************************
-            // WORKAROUND: Construir el objeto PagedResult manualmente.
-            // WARNING: El TotalCount es una ESTIMACIÓN para que la UI de Paginación funcione
-            // y no es el valor real de la base de datos.
-            // *************************************************************************
-            var totalCountEstimate = currentCount < pageSize
-                ? (page - 1) * pageSize + currentCount // Si no hay página completa, este es el total real
-                : page * pageSize + 1; // Si hay página completa, asumimos al menos un elemento más
+            // *************************************************************************
+            // WORKAROUND: Manually construct the PagedResult object.
+            // WARNING: The TotalCount is an ESTIMATE for the Pagination UI to function
+            // and is not the actual database count.
+            // *************************************************************************
+            var totalCountEstimate = currentCount < pageSize
+        ? (page - 1) * pageSize + currentCount // If not a full page, this is the real total
+                : page * pageSize + 1; // If it's a full page, we assume at least one more item exists
 
-            return new ModelsV2.PagedResult<Bike>
+            return new ModelsV2.PagedResult<Bike>
             {
                 TotalCount = totalCountEstimate,
                 PageNumber = page,
@@ -112,8 +112,8 @@ namespace fs_2025_assessment_2_80457.Services
             };
         }
 
-        // Obtiene una sola estación por su número.
-        public async Task<Bike?> GetStationByNumberAsync(int number)
+        // Retrieves a single station by its number.
+        public async Task<Bike?> GetStationByNumberAsync(int number)
         {
             var url = $"{V2_BASE_ROUTE}/{number}";
 
@@ -125,23 +125,23 @@ namespace fs_2025_assessment_2_80457.Services
             return await response.Content.ReadFromJsonAsync<Bike>();
         }
 
-        // Crea una nueva estación (POST)
-        public async Task<Bike> CreateStationAsync(Bike newStation)
+        // Creates a new station (POST)
+        public async Task<Bike> CreateStationAsync(Bike newStation)
         {
             var response = await _httpClient.PostAsJsonAsync(V2_BASE_ROUTE, newStation);
             response.EnsureSuccessStatusCode();
             return (await response.Content.ReadFromJsonAsync<Bike>())!;
         }
 
-        // Actualiza una estación existente (PUT)
-        public async Task UpdateStationAsync(int number, Bike updatedStation)
+        // Updates an existing station (PUT)
+        public async Task UpdateStationAsync(int number, Bike updatedStation)
         {
             var response = await _httpClient.PutAsJsonAsync($"{V2_BASE_ROUTE}/{number}", updatedStation);
             response.EnsureSuccessStatusCode();
         }
 
-        // Elimina una estación (DELETE)
-        public async Task DeleteStationAsync(int number)
+        // Deletes a station (DELETE)
+        public async Task DeleteStationAsync(int number)
         {
             var response = await _httpClient.DeleteAsync($"{V2_BASE_ROUTE}/{number}");
             response.EnsureSuccessStatusCode();
