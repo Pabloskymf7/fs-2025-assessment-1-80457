@@ -1,0 +1,27 @@
+﻿@page "/stations/create"
+@rendermode InteractiveServer
+@using fs_2025_assessment_2_80457.Components
+@using fs_2025_assessment_2_80457.Services
+@inject NavigationManager NavManager
+
+<PageTitle>Create New Station</PageTitle>
+
+## ➕ Create New Station
+
+<StationForm Model="_model" OnSubmitted="HandleSuccess" OnCancel="HandleCancel" />
+
+@code {
+	private StationForm.StationFormModel _model = new();
+
+	private void HandleSuccess()
+	{
+		// Redirect to the station list after creation
+		NavManager.NavigateTo("/stations");
+	}
+
+	private void HandleCancel()
+	{
+		// Redirect to the list if cancelled
+		NavManager.NavigateTo("/stations");
+	}
+}

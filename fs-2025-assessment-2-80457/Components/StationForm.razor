@@ -1,0 +1,217 @@
+﻿@using fs_2025_assessment_1_80457.Models
+@using System.ComponentModel.DataAnnotations
+@using fs_2025_assessment_2_80457.Services
+@inject IStationsApiClient ApiClient
+
+@code {
+	// Form model class
+	public class StationFormModel
+	{
+		// Required fields with minimum validation
+		[Required(ErrorMessage = "Name is required.")]
+		[StringLength(100, ErrorMessage = "Name cannot exceed 100 characters.")]
+		public string? Name { get; set; }
+
+		[Required(ErrorMessage = "Address is required.")]
+		public string? Address { get; set; }
+
+		[Required(ErrorMessage = "Number is required.")]
+		[Range(1, 9999, ErrorMessage = "Station number must be positive.")]
+		public int? Number { get; set; }
+
+		[Required(ErrorMessage = "Total stands are required.")]
+		[Range(1, 200, ErrorMessage = "Stands must be between 1 and 200.")]
+		public int BikeStands { get; set; }
+
+		// Maps the actual capacity (e.g.: 50)
+		public int AvailableBikeStands { get; set; }
+
+		[Range(0, 200, ErrorMessage = "Available bikes cannot be negative.")]
+		public int AvailableBikes { get; set; }
+
+		// Value must be "OPEN" or "CLOSED"
+		[Required(ErrorMessage = "Status is required.")]
+		public string? Status { get; set; } = "OPEN";
+
+		// Lat/Lng
+		[Range(-90.0, 90.0, ErrorMessage = "Invalid Latitude.")]
+		public double? Lat { get; set; }
+
+		[Range(-180.0, 180.0, ErrorMessage = "Invalid Longitude.")]
+		public double? Lng { get; set; }
+
+		// Property to differentiate between Create and Edit
+		public bool IsNew => OriginalStationId == null;
+		public string? OriginalStationId { get; set; }
+	}
+}
+
+<div class="card p-4 shadow">
+	<h4>@(Model.IsNew ? "Create New Station" : $"Edit Station {Model.Number}")</h4>
+
+	<EditForm Model="Model" OnValidSubmit="HandleValidSubmit" OnInvalidSubmit="HandleInvalidSubmit" FormName="StationEditForm">
+		<DataAnnotationsValidator />
+		<ValidationSummary />
+
+		<div class="row mb-3">
+			<div class="col-md-8">
+				<label for="name" class="form-label">Station Name</label>
+				<InputText id="name" class="form-control" @bind-Value="Model.Name" />
+				<ValidationMessage For="@(() => Model.Name)" />
+			</div>
+			<div class="col-md-4">
+				<label for="number" class="form-label">Station Number</label>
+				<InputNumber id="number" class="form-control" @bind-Value="Model.Number" readonly="@(!Model.IsNew)" />
+				<ValidationMessage For="@(() => Model.Number)" />
+			</div>
+		</div>
+
+		<div class="mb-3">
+			<label for="address" class="form-label">Address</label>
+			<InputText id="address" class="form-control" @bind-Value="Model.Address" />
+			<ValidationMessage For="@(() => Model.Address)" />
+		</div>
+
+		<div class="mb-3">
+			<label for="status" class="form-label">Status</label>
+			<InputSelect id="status" class="form-select" @bind-Value="Model.Status">
+				<option value="OPEN">Open</option>
+				<option value="CLOSED">Closed</option>
+			</InputSelect>
+			<ValidationMessage For="@(() => Model.Status)" />
+		</div>
+
+		<div class="row mb-3">
+			<div class="col-md-6">
+				<label for="bikeStands" class="form-label">Total Stands (bike_stands)</label>
+				<InputNumber id="bikeStands" class="form-control" @bind-Value="Model.BikeStands" />
+				<ValidationMessage For="@(() => Model.BikeStands)" />
+			</div>
+			<div class="col-md-6">
+				<label for="availableBikes" class="form-label">Available Bikes</label>
+				<InputNumber id="availableBikes" class="form-control" @bind-Value="Model.AvailableBikes" />
+				<ValidationMessage For="@(() => Model.AvailableBikes)" />
+			</div>
+		</div>
+
+		<div class="row mb-3">
+			<div class="col-md-6">
+				<label for="lat" class="form-label">Latitude</label>
+				<InputNumber id="lat" class="form-control" @bind-Value="Model.Lat" step="0.000001" />
+				<ValidationMessage For="@(() => Model.Lat)" />
+			</div>
+			<div class="col-md-6">
+				<label for="lng" class="form-label">Longitude</label>
+				<InputNumber id="lng" class="form-control" @bind-Value="Model.Lng" step="0.000001" />
+				<ValidationMessage For="@(() => Model.Lng)" />
+			</div>
+		</div>
+
+		<div class="d-flex justify-content-between">
+			<button type="submit" class="btn btn-success">
+				@(Model.IsNew ? "Create Station" : "Save Changes")
+			</button>
+			<button type="button" class="btn btn-secondary" @onclick="HandleCancelClick">
+				Cancel
+			</button>
+		</div>
+	</EditForm>
+
+	@if (!string.IsNullOrEmpty(feedbackMessage))
+	{
+		<div class="alert @feedbackCssClass mt-3" role="alert">
+			@feedbackMessage
+		</div>
+	}
+</div>
+
+
+@code {
+	// Parameter to pass the data model (can be an existing or new station)
+	[Parameter]
+	public StationFormModel Model { get; set; } = new StationFormModel();
+
+	// Event to notify the parent component when the form is successfully submitted/cancelled.
+	[Parameter]
+	public EventCallback OnSubmitted { get; set; }
+
+	[Parameter]
+	public EventCallback OnCancel { get; set; }
+
+	private string? feedbackMessage;
+	private string feedbackCssClass = "alert-info";
+
+	// Handler if form validation is NOT successful.
+	private void HandleInvalidSubmit()
+	{
+		// 🚨🚨🚨 BREAKPOINT FOR VALIDATION FAILURES 🚨🚨🚨
+		feedbackMessage = "❌ Please correct the form validation errors.";
+		feedbackCssClass = "alert-danger";
+	}
+
+	// Handler for the Cancel button
+	private async Task HandleCancelClick()
+	{
+		await OnCancel.InvokeAsync();
+	}
+
+
+	// Handles form submission when validation is successful.
+	private async Task HandleValidSubmit()
+	{
+		feedbackMessage = "Sending data to API...";
+		feedbackCssClass = "alert-info";
+
+		// Map the form model to the Bike class
+		var bikeToSubmit = new Bike
+		{
+			id = Model.OriginalStationId, // Use the original ID for PUT
+			number = Model.Number!.Value,
+			name = Model.Name,
+			address = Model.Address,
+			status = Model.Status,
+			bike_stands = Model.BikeStands, // The total capacity
+			available_bikes = Model.AvailableBikes,
+			// Available bike_stands is the difference between total capacity and bikes.
+			available_bike_stands = Model.BikeStands - Model.AvailableBikes,
+			last_update_epoch = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), // Update timestamp
+			contract_name = "Dublin", // Assume contract for new stations
+			banking = false,
+			bonus = false,
+			position = new Position { Lat = Model.Lat ?? 0, Lng = Model.Lng ?? 0 }
+		};
+
+		try
+		{
+			if (Model.IsNew)
+			{
+				// POST: Create new record
+				await ApiClient.CreateStationAsync(bikeToSubmit);
+				feedbackMessage = "✅ Station created successfully.";
+				feedbackCssClass = "alert-success";
+			}
+			else
+			{
+				// PUT: Update existing record
+				await ApiClient.UpdateStationAsync(bikeToSubmit.number, bikeToSubmit);
+				feedbackMessage = "✅ Station updated successfully.";
+				feedbackCssClass = "alert-success";
+			}
+
+			// Notify the parent component
+			await OnSubmitted.InvokeAsync();
+		}
+		catch (HttpRequestException ex)
+		{
+			// 🚨🚨🚨 BREAKPOINT FOR API FAILURES 🚨🚨🚨
+			// API error handling
+			feedbackMessage = $"❌ API Error: {ex.Message}";
+			feedbackCssClass = "alert-danger";
+		}
+		catch (Exception ex)
+		{
+			feedbackMessage = $"❌ Unexpected error: {ex.Message}";
+			feedbackCssClass = "alert-danger";
+		}
+	}
+}

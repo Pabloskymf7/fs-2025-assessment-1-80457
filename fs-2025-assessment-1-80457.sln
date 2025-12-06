@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.0.11222.15 d18.0
+VisualStudioVersion = 18.0.11222.15
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "fs-2025-assessment-1-80457", "fs-2025-assessment-1-80457\fs-2025-assessment-1-80457.csproj", "{DF6D4EBF-F680-4849-9875-12DD322CC737}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "fs-2025-assessment-1-80457-Test", "fs-2025-assessment-1-80457-Test\fs-2025-assessment-1-80457-Test.csproj", "{A30CBA9A-8781-4056-9348-7FFFE0097567}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "fs-2025-assessment-2-80457", "fs-2025-assessment-2-80457\fs-2025-assessment-2-80457.csproj", "{5C1C3651-FECF-4665-BD4F-160E6DCCC789}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{A30CBA9A-8781-4056-9348-7FFFE0097567}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A30CBA9A-8781-4056-9348-7FFFE0097567}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A30CBA9A-8781-4056-9348-7FFFE0097567}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5C1C3651-FECF-4665-BD4F-160E6DCCC789}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C1C3651-FECF-4665-BD4F-160E6DCCC789}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C1C3651-FECF-4665-BD4F-160E6DCCC789}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C1C3651-FECF-4665-BD4F-160E6DCCC789}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

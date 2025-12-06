@@ -1,0 +1,311 @@
+﻿@page "/stations"
+@rendermode InteractiveServer
+@using fs_2025_assessment_1_80457.Models
+@using ModelsV2 = fs_2025_assessment_2_80457.Models
+@using fs_2025_assessment_2_80457.Components
+@using fs_2025_assessment_2_80457.Services
+@inject IStationsApiClient ApiClient
+@inject NavigationManager NavManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Dublin Bikes Stations</PageTitle>
+
+## 🚲 Dublin Bikes Stations
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+	<p class="lead mb-0">Explore the @(_pagedResult?.TotalCount.ToString() ?? "...") available stations. Total on page: @_pagedResult?.Items.Count</p>
+	<a href="/stations/create" class="btn btn-success" role="button">
+		<span class="bi bi-plus-circle"></span> Create New Station
+	</a>
+</div>
+
+<div class="row mb-3">
+	<div class="col">
+		<input type="text" @bind-value="SearchTerm" @bind-value:event="oninput"
+			           placeholder="Search by name or address..." class="form-control"
+			           @onkeyup="HandleSearchEnter" />
+	</div>
+	<div class="col-auto">
+		<select @bind="StatusFilter" class="form-select">
+			<option value="">All Stations</option>
+			<option value="OPEN">Open (OPEN)</option>
+			<option value="CLOSED">Closed (CLOSED)</option>
+		</select>
+	</div>
+	<div class="col-auto">
+		<input type="number" @bind="MinBikesFilter" placeholder="Min. Bikes" class="form-control" />
+	</div>
+	<div class="col-auto">
+		<button class="btn btn-primary" @onclick="ApplyFilters">Apply Filters</button>
+		<button class="btn btn-secondary" @onclick="ClearFilters">Clear</button>
+	</div>
+</div>
+
+@if (_isLoading)
+{
+	<div class="alert alert-info" role="alert">
+		Loading stations, please wait...
+	</div>
+}
+else if (!string.IsNullOrEmpty(_errorMessage))
+{
+	<div class="alert alert-danger" role="alert">
+		@_errorMessage
+	</div>
+}
+else if (_pagedResult?.Items.Count == 0)
+{
+	<div class="alert alert-warning" role="alert">
+		No stations found matching the filters.
+	</div>
+}
+else
+{
+	<table class="table table-striped table-hover responsive-table">
+		<thead>
+			<tr>
+				<th>
+					<button class="btn btn-link p-0 text-decoration-none"
+							              @onclick='() => SortBy("Name")'>
+						Station @GetSortIndicator("Name")
+					</button>
+				</th>
+				<th class="d-none d-md-table-cell">Address</th>
+				<th>
+					<button class="btn btn-link p-0 text-decoration-none"
+							              @onclick='() => SortBy("AvailableBikes")'>
+						Avail. Bikes @GetSortIndicator("AvailableBikes")
+					</button>
+				</th>
+				<th>Capacity</th>
+				<th>Status</th>
+				<th>Actions</th>
+			</tr>
+		</thead>
+		<tbody>
+			@foreach (var station in _pagedResult!.Items)
+			{
+				<tr @onclick="() => SelectStation(station)" role="button" class="@(IsSelected(station) ? "table-primary" : "")">
+					<td>@station.name</td>
+					<td class="d-none d-md-table-cell">@station.address</td>
+					<td>@station.available_bikes / @station.bike_stands</td>
+					<td>@station.bike_stands</td>
+					<td>
+						<span class="badge @(station.status == "OPEN" ? "bg-success" : "bg-danger")">
+							@station.status
+						</span>
+					</td>
+					<td>
+						<button class="btn btn-sm btn-warning me-2" @onclick:stopPropagation @onclick="() => OpenEditForm(station)">
+							Edit
+						</button>
+						<button class="btn btn-sm btn-danger" @onclick:stopPropagation @onclick="() => DeleteStation(station.number, station.name!)">
+							Delete
+						</button>
+					</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+
+	<div class="d-flex justify-content-between align-items-center mt-3">
+		@if (_pagedResult.PageNumber > 1)
+		{
+			<button class="btn btn-outline-dark" @onclick="() => ChangePage(_pagedResult.PageNumber - 1)">« Previous</button>
+		}
+		else
+		{
+			<span style="visibility: hidden;">Previous</span>
+		}
+
+		<span>Page @_pagedResult.PageNumber of @_pagedResult.TotalPages</span>
+
+		@if (_pagedResult.PageNumber < _pagedResult.TotalPages)
+		{
+			<button class="btn btn-outline-dark" @onclick="() => ChangePage(_pagedResult.PageNumber + 1)">Next »</button>
+		}
+		else
+		{
+			<span style="visibility: hidden;">Next</span>
+		}
+	</div>
+}
+
+<hr />
+
+@if (_selectedStation != null && _editingStation == null)
+{
+	<StationDetail Station="_selectedStation" OnClose="ClearSelection" />
+}
+
+@if (_editingStation != null)
+{
+	<div class="mt-4">
+		<StationForm Model="_editingStation"
+					            OnSubmitted="HandleEditSuccess"
+					            OnCancel="ClearEditing" />
+	</div>
+}
+
+@code {
+	private ModelsV2.PagedResult<Bike>? _pagedResult;
+	private Bike? _selectedStation;
+	private bool _isLoading = true;
+	private string? _errorMessage;
+
+	private string SearchTerm { get; set; } = string.Empty;
+	private string StatusFilter { get; set; } = string.Empty;
+	private int? MinBikesFilter { get; set; }
+	private int CurrentPage { get; set; } = 1;
+	private int PageSize { get; set; } = 10;
+	private string SortField { get; set; } = "Name";
+	private bool IsAscending { get; set; } = true;
+
+	private StationForm.StationFormModel? _editingStation;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadStationsAsync();
+	}
+
+	private async Task LoadStationsAsync()
+	{
+		_isLoading = true;
+		_errorMessage = null;
+		_pagedResult = null;
+		StateHasChanged();
+
+		try
+		{
+			_pagedResult = await ApiClient.GetStationsAsync(
+			  page: CurrentPage,
+			  pageSize: PageSize,
+			  search: SearchTerm,
+			  status: StatusFilter,
+			  minBikes: MinBikesFilter,
+			  sortField: SortField,
+			  isAscending: IsAscending
+			);
+		}
+		catch (HttpRequestException ex)
+		{
+			_errorMessage = $"API communication failed: {ex.Message}";
+		}
+		catch (Exception ex)
+		{
+			_errorMessage = $"An unexpected error occurred: {ex.Message}";
+		}
+		finally
+		{
+			_isLoading = false;
+		}
+	}
+
+	private void SelectStation(Bike station)
+	{
+		if (_editingStation != null) return;
+		_selectedStation = (_selectedStation?.number == station.number) ? null : station;
+	}
+
+	private void ClearSelection() => _selectedStation = null;
+	private bool IsSelected(Bike station) => _selectedStation?.number == station.number;
+
+	private async Task SortBy(string field)
+	{
+		if (SortField == field)
+			IsAscending = !IsAscending;
+		else
+		{
+			SortField = field;
+			IsAscending = true;
+		}
+		CurrentPage = 1;
+		await LoadStationsAsync();
+	}
+
+	private string GetSortIndicator(string field)
+	{
+		if (SortField != field) return string.Empty;
+		return IsAscending ? "▲" : "▼";
+	}
+
+	private async Task ApplyFilters()
+	{
+		CurrentPage = 1;
+		await LoadStationsAsync();
+	}
+
+	private async Task HandleSearchEnter(KeyboardEventArgs e)
+	{
+		if (e.Key == "Enter")
+			await ApplyFilters();
+	}
+
+	private async Task ClearFilters()
+	{
+		SearchTerm = string.Empty;
+		StatusFilter = string.Empty;
+		MinBikesFilter = null;
+		await ApplyFilters();
+	}
+
+	private async Task ChangePage(int page)
+	{
+		if (page >= 1 && _pagedResult != null && page <= _pagedResult.TotalPages)
+		{
+			CurrentPage = page;
+			await LoadStationsAsync();
+		}
+	}
+
+	private void OpenEditForm(Bike station)
+	{
+		ClearSelection();
+		_editingStation = new StationForm.StationFormModel
+		{
+			OriginalStationId = station.id,
+			Number = station.number,
+			Name = station.name,
+			Address = station.address,
+			Status = station.status,
+			BikeStands = station.bike_stands,
+			AvailableBikes = station.available_bikes,
+			AvailableBikeStands = station.available_bike_stands,
+			Lat = station.position?.Lat,
+			Lng = station.position?.Lng
+		};
+	}
+
+	private async Task HandleEditSuccess()
+	{
+		ClearEditing();
+		await LoadStationsAsync();
+	}
+
+	private void ClearEditing() => _editingStation = null;
+
+	private async Task DeleteStation(int number, string name)
+	{
+		bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to DELETE station '{name}' (Number: {number})?");
+
+		if (confirmed)
+		{
+			try
+			{
+				await ApiClient.DeleteStationAsync(number);
+				await LoadStationsAsync();
+				_errorMessage = $"✅ Station {name} deleted successfully.";
+				await Task.Delay(3000);
+				_errorMessage = null;
+			}
+			catch (Exception ex)
+			{
+				_errorMessage = $"❌ Error deleting station: {ex.Message}";
+			}
+			finally
+			{
+				StateHasChanged();
+			}
+		}
+	}
+}
