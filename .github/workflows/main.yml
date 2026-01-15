@@ -48,11 +48,14 @@ jobs:
 
       # xUnit tests + Coverlet data collector
       - name: Test (xUnit) and collect coverage
-        run: >
-          dotnet test $TEST_PROJECT -c Release --no-build
-          --collect:"XPlat Code Coverage"
+       run: |
+        dotnet test "$TEST_PROJECT" \
+          -c Release \
+          --no-build \
+          --collect:"XPlat Code Coverage" \
+          --settings coverlet.runsettings \
           --logger "trx;LogFileName=test-results.trx"
-
+          
       - name: Install ReportGenerator
         run: dotnet tool install -g dotnet-reportgenerator-globaltool
 
